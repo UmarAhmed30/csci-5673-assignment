@@ -60,3 +60,8 @@ CREATE TABLE purchases (
     item_id INT,
     timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Stub Commands
+
+INSERT INTO buyers (buyer_name, password)
+VALUES ("Umar", "umar");
