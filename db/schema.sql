@@ -65,3 +65,46 @@ CREATE TABLE purchases (
 
 INSERT INTO buyers (buyer_name, password)
 VALUES ("Umar", "umar");
+
+INSERT INTO sellers (seller_name, password, thumbs_up, thumbs_down, items_sold)
+VALUES
+('Seller1', 'seller1', 10, 1, 5),
+('Seller2', 'seller2', 3, 0, 2),
+('Seller3', 'seller3', 0, 0, 0);
+
+INSERT INTO items (
+    seller_id,
+    item_name,
+    category,
+    condition_type,
+    price,
+    quantity,
+    thumbs_up,
+    thumbs_down
+)
+VALUES
+(1, 'iPhone 12', 1, 'used', 599.99, 3, 5, 1),
+(1, 'MacBook Air', 1, 'used', 899.50, 2, 8, 0),
+(2, 'Office Chair', 2, 'new', 129.99, 10, 2, 0),
+(2, 'Study Table', 2, 'used', 89.99, 5, 1, 1),
+(3, 'Wireless Mouse', 3, 'new', 19.99, 25, 0, 0);
+
+INSERT INTO item_keywords (item_id, keyword)
+VALUES
+(1, 'phone'),
+(1, 'apple'),
+(1, 'ios'),
+(2, 'laptop'),
+(2, 'apple'),
+(2, 'mac'),
+(3, 'chair'),
+(3, 'office'),
+(3, 'seat'),
+(4, 'table'),
+(4, 'desk'),
+(4, 'study'),
+(5, 'mouse'),
+(5, 'wireless'),
+(5, 'usb');
+
+-- TODO: Add category table
