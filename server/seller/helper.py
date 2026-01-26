@@ -6,16 +6,17 @@ import time
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from server.seller.config import SELLER_SERVER_CONFIG
-from db.client import DBClient
+from db.client import CustomerDBClient, ProductDBClient
 
 SESSION_TIMEOUT_SECS = SELLER_SERVER_CONFIG["session_timeout_secs"]
 
 
-db = DBClient()
+customer_db = CustomerDBClient()
+product_db = ProductDBClient()
 
 
 def create_seller(username, password):
-    conn = db.get_connection()
+    conn = customer_db.get_connection()
     cur = conn.cursor()
     cur.execute(
         "INSERT INTO sellers (seller_name, password) VALUES (%s, %s)",
@@ -29,7 +30,7 @@ def create_seller(username, password):
 
 
 def login_seller(username, password):
-    conn = db.get_connection()
+    conn = customer_db.get_connection()
     cur = conn.cursor(dictionary=True)
     cur.execute(
         "SELECT seller_id FROM sellers WHERE seller_name=%s AND password=%s",
@@ -55,7 +56,7 @@ def login_seller(username, password):
 
 
 def logout_seller(session_id):
-    conn = db.get_connection()
+    conn = customer_db.get_connection()
     cur = conn.cursor()
     cur.execute(
         "DELETE FROM sessions WHERE session_id=%s AND user_type='seller'",
@@ -69,7 +70,7 @@ def logout_seller(session_id):
 def validate_session(session_id):
     if not session_id:
         return None
-    conn = db.get_connection()
+    conn = customer_db.get_connection()
     cur = conn.cursor(dictionary=True)
     cur.execute(
         """
@@ -92,7 +93,7 @@ def validate_session(session_id):
 
 
 def touch_session(session_id):
-    conn = db.get_connection()
+    conn = customer_db.get_connection()
     cur = conn.cursor()
     cur.execute(
         "UPDATE sessions SET last_active=NOW() WHERE session_id=%s AND user_type = 'seller'",
@@ -104,7 +105,7 @@ def touch_session(session_id):
 
 
 def get_seller_rating(seller_id):
-    conn = db.get_connection()
+    conn = customer_db.get_connection()
     cur = conn.cursor(dictionary=True)
     cur.execute(
         "SELECT thumbs_up, thumbs_down FROM sellers WHERE seller_id=%s",
@@ -120,7 +121,7 @@ def register_item_for_sale(seller_id,item_name, item_category, condition_type, s
         if len(kw) > 8:
             return False, "Keyword length must be <= 8 characters"
     print("reached register item for sale")
-    conn = db.get_connection()
+    conn = product_db.get_connection()
     cur = conn.cursor(dictionary=True)
     cur.execute(
         "INSERT INTO items (seller_id, item_name, category, condition_type, price, quantity) VALUES (%s, %s, %s, %s, %s, %s)",
@@ -145,7 +146,7 @@ def register_item_for_sale(seller_id,item_name, item_category, condition_type, s
 
 
 def display_items_for_sale(seller_id):
-    conn = db.get_connection()
+    conn = product_db.get_connection()
     cur = conn.cursor(dictionary=True)
     cur.execute(
         "SELECT  item_id, item_name, category, condition_type, price, quantity, thumbs_up, thumbs_down from items where seller_id=%s",
@@ -157,7 +158,7 @@ def display_items_for_sale(seller_id):
     return rows
 
 def update_units_for_sale(seller_id, item_id, quantity):
-    conn = db.get_connection()
+    conn = product_db.get_connection()
     cur = conn.cursor(dictionary=True)
     cur.execute(
         "UPDATE  items SET quantity=%s WHERE item_id=%s AND seller_id=%s",
@@ -170,7 +171,7 @@ def update_units_for_sale(seller_id, item_id, quantity):
     return True, "UPDATED"
 
 def change_item_price(seller_id, item_id, price):
-    conn = db.get_connection()
+    conn = product_db.get_connection()
     cur = conn.cursor(dictionary=True)
     cur.execute(
         "UPDATE  items SET price=%s WHERE item_id=%s AND seller_id=%s",

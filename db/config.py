@@ -3,11 +3,20 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-DB_CONFIG = {
-    "host": os.getenv("DB_HOST"),
-    "port": int(os.getenv("DB_PORT")),
-    "user": os.getenv("DB_USER"),
-    "password": os.getenv("DB_PASSWORD"),
-    "database": os.getenv("DB_NAME"),
+CUSTOMER_DB_CONFIG = {
+    "host": os.getenv("CUSTOMER_DB_HOST"),
+    "port": int(os.getenv("CUSTOMER_DB_PORT")),
+    "user": os.getenv("CUSTOMER_DB_USER"),
+    "password": os.getenv("CUSTOMER_DB_PASSWORD"),
+    "database": os.getenv("CUSTOMER_DB_NAME"),
+    "pool_size": 10
+}
+
+PRODUCT_DB_CONFIG = {
+    "host": os.getenv("PRODUCT_DB_HOST"),
+    "port": int(os.getenv("PRODUCT_DB_PORT")),
+    "user": os.getenv("PRODUCT_DB_USER"),
+    "password": os.getenv("PRODUCT_DB_PASSWORD"),
+    "database": os.getenv("PRODUCT_DB_NAME"),
     "pool_size": 10
 }
