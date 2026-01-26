@@ -1,7 +1,8 @@
-CREATE DATABASE IF NOT EXISTS marketplace;
-USE marketplace;
-
--- Table Creation Commands
+-- ============================================
+-- Customer DB
+-- ============================================
+CREATE DATABASE IF NOT EXISTS customer_db;
+USE customer_db;
 
 CREATE TABLE buyers (
     buyer_id INT AUTO_INCREMENT PRIMARY KEY,
@@ -27,6 +28,23 @@ CREATE TABLE sessions (
         ON UPDATE CURRENT_TIMESTAMP
 );
 
+-- Stub Commands for Customer DB
+
+INSERT INTO buyers (buyer_name, password)
+VALUES ("Umar", "umar");
+
+INSERT INTO sellers (seller_name, password, thumbs_up, thumbs_down, items_sold)
+VALUES
+('Seller1', 'seller1', 10, 1, 5),
+('Seller2', 'seller2', 3, 0, 2),
+('Seller3', 'seller3', 0, 0, 0);
+
+-- ============================================
+-- Product DB
+-- ============================================
+CREATE DATABASE IF NOT EXISTS product_db;
+USE product_db;
+
 CREATE TABLE items (
     item_id INT AUTO_INCREMENT PRIMARY KEY,
     seller_id INT NOT NULL,
@@ -36,8 +54,7 @@ CREATE TABLE items (
     price FLOAT,
     quantity INT,
     thumbs_up INT DEFAULT 0,
-    thumbs_down INT DEFAULT 0,
-    FOREIGN KEY (seller_id) REFERENCES sellers(seller_id)
+    thumbs_down INT DEFAULT 0
 );
 
 CREATE TABLE item_keywords (
@@ -51,7 +68,6 @@ CREATE TABLE cart (
     item_id INT,
     quantity INT,
     PRIMARY KEY (buyer_id, item_id),
-    FOREIGN KEY (buyer_id) REFERENCES buyers(buyer_id),
     FOREIGN KEY (item_id) REFERENCES items(item_id)
 );
 
@@ -61,16 +77,12 @@ CREATE TABLE purchases (
     timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Stub Commands
+CREATE TABLE categories (
+    category_id INT PRIMARY KEY,
+    category_name VARCHAR(32) NOT NULL
+);
 
-INSERT INTO buyers (buyer_name, password)
-VALUES ("Umar", "umar");
-
-INSERT INTO sellers (seller_name, password, thumbs_up, thumbs_down, items_sold)
-VALUES
-('Seller1', 'seller1', 10, 1, 5),
-('Seller2', 'seller2', 3, 0, 2),
-('Seller3', 'seller3', 0, 0, 0);
+-- Stub Commands for Product DB
 
 INSERT INTO items (
     seller_id,
@@ -107,4 +119,10 @@ VALUES
 (5, 'wireless'),
 (5, 'usb');
 
--- TODO: Add category table
+INSERT INTO categories (category_id, category_name)
+VALUES
+(1, 'Electronics'),
+(2, 'Furniture'),
+(3, 'Accessories'),
+(4, 'Books'),
+(5, 'Clothing');
