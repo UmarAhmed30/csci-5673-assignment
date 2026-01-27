@@ -164,12 +164,16 @@ class BuyerServer:
     def handle_provide_feedback(self, args):
         item_id = args.get("item_id")
         feedback = args.get("feedback")
-        provide_item_feedback(item_id, feedback)
-        return success("Feedback recorded")
+        ok, msg = provide_item_feedback(item_id, feedback)
+        if not ok:
+            return error(msg)
+        return success(msg)
 
     def handle_get_seller_rating(self, args):
         seller_id = args.get("seller_id")
         rating = get_seller_rating(seller_id)
+        if not rating:
+            return error("Seller not found")
         return success(rating)
 
     def handle_get_buyer_purchases(self, buyer_id):

@@ -125,6 +125,8 @@ def search_items(category, keywords):
 
 
 def get_item(item_id):
+    if not isinstance(item_id, int) or item_id <= 0:
+        return None
     conn = product_db.get_connection()
     cur = conn.cursor(dictionary=True)
     cur.execute(
@@ -138,6 +140,10 @@ def get_item(item_id):
 
 
 def add_to_cart(buyer_id, item_id, qty):
+    if not isinstance(item_id, int) or item_id <= 0:
+        return False, "Item ID must be a positive integer"
+    if not isinstance(qty, int) or qty <= 0:
+        return False, "Quantity must be a positive integer"
     conn = product_db.get_connection()
     cur = conn.cursor()
     cur.execute(
@@ -145,10 +151,22 @@ def add_to_cart(buyer_id, item_id, qty):
         (item_id,),
     )
     row = cur.fetchone()
-    if not row or row[0] < qty:
+    if not row:
         cur.close()
         conn.close()
-        return False, "Insufficient quantity"
+        return False, "Item not found"
+    available_qty = row[0]
+    cur.execute(
+        "SELECT quantity FROM cart WHERE buyer_id=%s AND item_id=%s",
+        (buyer_id, item_id),
+    )
+    cart_row = cur.fetchone()
+    current_cart_qty = cart_row[0] if cart_row else 0
+    total_requested = current_cart_qty + qty
+    if total_requested > available_qty:
+        cur.close()
+        conn.close()
+        return False, f"Insufficient quantity. Available: {available_qty}, In cart: {current_cart_qty}, Requested: {qty}"
     cur.execute(
         "INSERT INTO cart (buyer_id, item_id, quantity) "
         "VALUES (%s, %s, %s) "
@@ -161,6 +179,10 @@ def add_to_cart(buyer_id, item_id, qty):
 
 
 def remove_from_cart(buyer_id, item_id, qty):
+    if not isinstance(item_id, int) or item_id <= 0:
+        return False, "Item ID must be a positive integer"
+    if not isinstance(qty, int) or qty <= 0:
+        return False, "Quantity must be a positive integer"
     conn = product_db.get_connection()
     cur = conn.cursor()
     cur.execute(
@@ -168,11 +190,17 @@ def remove_from_cart(buyer_id, item_id, qty):
         (buyer_id, item_id),
     )
     row = cur.fetchone()
-    if not row or row[0] < qty:
+    if not row:
         cur.close()
         conn.close()
-        return False, "Not enough items in cart"
-    if row[0] == qty:
+        return False, "Item not in cart"
+    current_qty = row[0]
+    if qty > current_qty:
+        cur.close()
+        conn.close()
+        return False, f"Cannot remove {qty} items. Only {current_qty} in cart"
+    if qty == current_qty:
+        # Remove entire entry if removing all items
         cur.execute(
             "DELETE FROM cart WHERE buyer_id=%s AND item_id=%s",
             (buyer_id, item_id),
@@ -217,8 +245,21 @@ def save_cart(buyer_id):
 
 
 def provide_item_feedback(item_id, feedback):
+    if not isinstance(item_id, int) or item_id <= 0:
+        return False, "Item ID must be a positive integer"
+    if feedback not in ("up", "down"):
+        return False, "Feedback must be either 'up' or 'down'"
     conn = product_db.get_connection()
     cur = conn.cursor()
+    cur.execute(
+        "SELECT item_id FROM items WHERE item_id=%s",
+        (item_id,),
+    )
+    row = cur.fetchone()
+    if not row:
+        cur.close()
+        conn.close()
+        return False, "Item not found"
     if feedback == "up":
         cur.execute(
             "UPDATE items SET thumbs_up = thumbs_up + 1 WHERE item_id=%s",
@@ -231,9 +272,12 @@ def provide_item_feedback(item_id, feedback):
         )
     cur.close()
     conn.close()
+    return True, "Feedback recorded"
 
 
 def get_seller_rating(seller_id):
+    if not isinstance(seller_id, int) or seller_id <= 0:
+        return None
     conn = customer_db.get_connection()
     cur = conn.cursor(dictionary=True)
     cur.execute(
