@@ -134,30 +134,53 @@ class BuyerClient:
         if len(parts) != 2:
             print("Usage: get_item <item_id>")
             return
-        resp = self.send("get_item", {
-            "item_id": int(parts[1]),
-        })
-        print(resp)
+        try:
+            item_id = int(parts[1])
+            if item_id <= 0:
+                print("Error: Item ID must be a positive integer")
+                return
+            resp = self.send("get_item", {
+                "item_id": item_id,
+            })
+            print(resp)
+        except ValueError:
+            print("Error: item_id must be a valid integer")
 
     def add_to_cart(self, parts):
         if len(parts) != 3:
             print("Usage: add_to_cart <item_id> <qty>")
             return
-        resp = self.send("add_to_cart", {
-            "item_id": int(parts[1]),
-            "quantity": int(parts[2]),
-        })
-        print(resp)
+        try:
+            item_id = int(parts[1])
+            quantity = int(parts[2])
+            if quantity <= 0:
+                print("Error: Quantity must be a positive integer")
+                return
+            resp = self.send("add_to_cart", {
+                "item_id": item_id,
+                "quantity": quantity,
+            })
+            print(resp)
+        except ValueError:
+            print("Error: item_id and quantity must be valid integers")
 
     def remove_from_cart(self, parts):
         if len(parts) != 3:
             print("Usage: remove_from_cart <item_id> <qty>")
             return
-        resp = self.send("remove_from_cart", {
-            "item_id": int(parts[1]),
-            "quantity": int(parts[2]),
-        })
-        print(resp)
+        try:
+            item_id = int(parts[1])
+            quantity = int(parts[2])
+            if quantity <= 0:
+                print("Error: Quantity must be a positive integer")
+                return
+            resp = self.send("remove_from_cart", {
+                "item_id": item_id,
+                "quantity": quantity,
+            })
+            print(resp)
+        except ValueError:
+            print("Error: item_id and quantity must be valid integers")
 
     def display_cart(self):
         resp = self.send("display_cart")
@@ -175,20 +198,34 @@ class BuyerClient:
         if len(parts) != 3 or parts[2] not in ("up", "down"):
             print("Usage: rate_item <item_id> up|down")
             return
-        resp = self.send("provide_feedback", {
-            "item_id": int(parts[1]),
-            "feedback": parts[2],
-        })
-        print(resp)
+        try:
+            item_id = int(parts[1])
+            if item_id <= 0:
+                print("Error: Item ID must be a positive integer")
+                return
+            resp = self.send("provide_feedback", {
+                "item_id": item_id,
+                "feedback": parts[2],
+            })
+            print(resp)
+        except ValueError:
+            print("Error: item_id must be a valid integer")
 
     def get_seller_rating(self, parts):
         if len(parts) != 2:
             print("Usage: get_seller_rating <seller_id>")
             return
-        resp = self.send("get_seller_rating", {
-            "seller_id": int(parts[1]),
-        })
-        print(resp)
+        try:
+            seller_id = int(parts[1])
+            if seller_id <= 0:
+                print("Error: Seller ID must be a positive integer")
+                return
+            resp = self.send("get_seller_rating", {
+                "seller_id": seller_id,
+            })
+            print(resp)
+        except ValueError:
+            print("Error: seller_id must be a valid integer")
 
     def get_purchases(self):
         resp = self.send("get_buyer_purchases")
