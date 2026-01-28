@@ -1,5 +1,6 @@
 import socket
 import sys
+import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
@@ -12,6 +13,9 @@ SERVER_PORT = SELLER_SERVER_CONFIG["port"]
 
 
 class SellerClient:
+    MAX_RECONNECT_ATTEMPTS = 3
+    RECONNECT_DELAY = 2  # seconds
+
     def __init__(self, host=SERVER_HOST, port=SERVER_PORT):
         self.host = host
         self.port = port
@@ -22,6 +26,26 @@ class SellerClient:
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.sock.connect((self.host, self.port))
         print("[SELLER][CLIENT] Connected to seller server")
+
+    def _reconnect(self):
+        print("[INFO] Attempting to reconnect...")
+        for attempt in range(self.MAX_RECONNECT_ATTEMPTS):
+            try:
+                if self.sock:
+                    try:
+                        self.sock.close()
+                    except:
+                        pass
+                time.sleep(self.RECONNECT_DELAY)
+                self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                self.sock.connect((self.host, self.port))
+                print(f"[OK] Reconnected successfully!")
+                return True
+            except Exception as e:
+                print(f"[WARN] Reconnection attempt {attempt + 1}/{self.MAX_RECONNECT_ATTEMPTS} failed: {e}")
+                if attempt < self.MAX_RECONNECT_ATTEMPTS - 1:
+                    print(f"[INFO] Retrying in {self.RECONNECT_DELAY} seconds...")
+        return False
 
     def close(self):
         if self.sock:
@@ -34,9 +58,26 @@ class SellerClient:
             msg["args"] = args
         if self.session_id:
             msg["session_id"] = self.session_id
-        send_msg(self.sock, msg)
-        resp = recv_msg(self.sock)
-        return resp
+        for attempt in range(self.MAX_RECONNECT_ATTEMPTS + 1):
+            try:
+                send_msg(self.sock, msg)
+                resp = recv_msg(self.sock)
+                return resp
+            except Exception as e:
+                print(f"[ERROR] Connection lost: {e}")
+                if op in ["login", "create_account"]:
+                    return {"status": "error", "message": f"Connection error: {e}"}
+                if attempt < self.MAX_RECONNECT_ATTEMPTS:
+                    if self._reconnect():
+                        print("[INFO] Retrying operation...")
+                        continue
+                    else:
+                        print("[ERROR] Failed to reconnect. Please restart client.")
+                        return {"status": "error", "message": "Connection lost. Failed to reconnect."}
+                else:
+                    print("[ERROR] Max reconnection attempts reached.")
+                    return {"status": "error", "message": "Connection lost. Please restart client."}
+        return {"status": "error", "message": "Failed to send request"}
 
     def repl(self):
         print("\nSeller CLI")
