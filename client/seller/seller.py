@@ -1,6 +1,8 @@
 import socket
 import sys
 from pathlib import Path
+import time
+import threading
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
@@ -116,7 +118,7 @@ class SellerClient:
         print(resp)
 
     def register_item_for_sale(self, parts):
-        if len(parts) != 7:
+        if len(parts) < 7:
             print(
                 "Usage: register_item_for_sale <item_name> <category> "
                 "<condition_type> <price> <quantity> <keywords>"
@@ -130,7 +132,7 @@ class SellerClient:
             "category": item_category,
             "condition_type": condition_type,
             "price": float(sale_price),
-            "quantity": item_quantity,
+            "quantity": int(item_quantity),
             "keywords": keywords
         })
 
@@ -153,7 +155,7 @@ class SellerClient:
 
         resp = self.send("update_units_for_sale", {
             "item_id": item_id,
-            "quantity": quantity
+            "quantity": int(quantity)
         })
 
         print(resp)
@@ -168,7 +170,7 @@ class SellerClient:
 
         resp = self.send("change_item_price", {
             "item_id": item_id,
-            "price": price
+            "price": float(price)
         })
 
         print(resp)
@@ -179,7 +181,7 @@ class SellerClient:
         1.     create_account <username> <password>
         2.     login <username> <password>
         3.     logout
-        4.     get_seller_rating <seller_id>
+        4.     get_seller_rating
         5.     display_items_for_sale
         6.     register_item_for_sale <item_name> <category> <condition_type> <price> <quantity> <keywords>
         7.     update_units_for_sale <item_id> <quantity>
@@ -187,10 +189,14 @@ class SellerClient:
         14.    exit
                 """)
 
+
+
 def main():
+    answer = input("> ").strip()
     client = SellerClient()
     client.connect()
     client.repl()
+
 
 if __name__ == "__main__":
     main()

@@ -7,3 +7,5 @@ python3 ./client/buyer/buyer.py
 
 python3 ./server/seller/seller.py  
 python3 ./client/seller/seller.py  
+
+python3 experiment_setup/simulate_seller.py

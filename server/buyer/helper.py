@@ -83,7 +83,7 @@ def validate_session(session_id):
     if not row:
         return None
     if time.time() - row["last_active"] > SESSION_TIMEOUT_SECS:
-        logout_session(session_id)
+        logout_session(session_id, conn)
         return None
     return row["user_id"]
 
