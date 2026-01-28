@@ -6,16 +6,17 @@ import time
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from server.buyer.config import BUYER_SERVER_CONFIG
-from db.client import DBClient
+from db.client import CustomerDBClient, ProductDBClient
 
 SESSION_TIMEOUT_SECS = BUYER_SERVER_CONFIG["session_timeout_secs"]
 
 
-db = DBClient()
+customer_db = CustomerDBClient()
+product_db = ProductDBClient()
 
 
 def create_buyer(username, password):
-    conn = db.get_connection()
+    conn = customer_db.get_connection()
     cur = conn.cursor()
     cur.execute(
         "INSERT INTO buyers (buyer_name, password) VALUES (%s, %s)",
@@ -28,7 +29,7 @@ def create_buyer(username, password):
 
 
 def login_buyer(username, password):
-    conn = db.get_connection()
+    conn = customer_db.get_connection()
     cur = conn.cursor(dictionary=True)
     cur.execute(
         "SELECT buyer_id FROM buyers WHERE buyer_name=%s AND password=%s",
@@ -53,7 +54,7 @@ def login_buyer(username, password):
 
 
 def logout_session(session_id):
-    conn = db.get_connection()
+    conn = customer_db.get_connection()
     cur = conn.cursor()
     cur.execute(
         "DELETE FROM sessions WHERE session_id=%s",
@@ -66,7 +67,7 @@ def logout_session(session_id):
 def validate_session(session_id):
     if not session_id:
         return None
-    conn = db.get_connection()
+    conn = customer_db.get_connection()
     cur = conn.cursor(dictionary=True)
     cur.execute(
         """
@@ -89,7 +90,7 @@ def validate_session(session_id):
 
 
 def touch_session(session_id):
-    conn = db.get_connection()
+    conn = customer_db.get_connection()
     cur = conn.cursor()
     cur.execute(
         "UPDATE sessions SET last_active=NOW() WHERE session_id=%s",
@@ -100,7 +101,7 @@ def touch_session(session_id):
 
 
 def search_items(category, keywords):
-    conn = db.get_connection()
+    conn = product_db.get_connection()
     cur = conn.cursor(dictionary=True)
     base_query = """
         SELECT DISTINCT i.*
@@ -124,7 +125,9 @@ def search_items(category, keywords):
 
 
 def get_item(item_id):
-    conn = db.get_connection()
+    if not isinstance(item_id, int) or item_id <= 0:
+        return None
+    conn = product_db.get_connection()
     cur = conn.cursor(dictionary=True)
     cur.execute(
         "SELECT * FROM items WHERE item_id=%s",
@@ -137,17 +140,33 @@ def get_item(item_id):
 
 
 def add_to_cart(buyer_id, item_id, qty):
-    conn = db.get_connection()
+    if not isinstance(item_id, int) or item_id <= 0:
+        return False, "Item ID must be a positive integer"
+    if not isinstance(qty, int) or qty <= 0:
+        return False, "Quantity must be a positive integer"
+    conn = product_db.get_connection()
     cur = conn.cursor()
     cur.execute(
         "SELECT quantity FROM items WHERE item_id=%s",
         (item_id,),
     )
     row = cur.fetchone()
-    if not row or row[0] < qty:
+    if not row:
         cur.close()
         conn.close()
-        return False, "Insufficient quantity"
+        return False, "Item not found"
+    available_qty = row[0]
+    cur.execute(
+        "SELECT quantity FROM cart WHERE buyer_id=%s AND item_id=%s",
+        (buyer_id, item_id),
+    )
+    cart_row = cur.fetchone()
+    current_cart_qty = cart_row[0] if cart_row else 0
+    total_requested = current_cart_qty + qty
+    if total_requested > available_qty:
+        cur.close()
+        conn.close()
+        return False, f"Insufficient quantity. Available: {available_qty}, In cart: {current_cart_qty}, Requested: {qty}"
     cur.execute(
         "INSERT INTO cart (buyer_id, item_id, quantity) "
         "VALUES (%s, %s, %s) "
@@ -160,18 +179,28 @@ def add_to_cart(buyer_id, item_id, qty):
 
 
 def remove_from_cart(buyer_id, item_id, qty):
-    conn = db.get_connection()
+    if not isinstance(item_id, int) or item_id <= 0:
+        return False, "Item ID must be a positive integer"
+    if not isinstance(qty, int) or qty <= 0:
+        return False, "Quantity must be a positive integer"
+    conn = product_db.get_connection()
     cur = conn.cursor()
     cur.execute(
         "SELECT quantity FROM cart WHERE buyer_id=%s AND item_id=%s",
         (buyer_id, item_id),
     )
     row = cur.fetchone()
-    if not row or row[0] < qty:
+    if not row:
         cur.close()
         conn.close()
-        return False, "Not enough items in cart"
-    if row[0] == qty:
+        return False, "Item not in cart"
+    current_qty = row[0]
+    if qty > current_qty:
+        cur.close()
+        conn.close()
+        return False, f"Cannot remove {qty} items. Only {current_qty} in cart"
+    if qty == current_qty:
+        # Remove entire entry if removing all items
         cur.execute(
             "DELETE FROM cart WHERE buyer_id=%s AND item_id=%s",
             (buyer_id, item_id),
@@ -188,7 +217,7 @@ def remove_from_cart(buyer_id, item_id, qty):
 
 
 def clear_cart(buyer_id):
-    conn = db.get_connection()
+    conn = product_db.get_connection()
     cur = conn.cursor()
     cur.execute(
         "DELETE FROM cart WHERE buyer_id=%s",
@@ -199,7 +228,7 @@ def clear_cart(buyer_id):
 
 
 def get_cart(buyer_id):
-    conn = db.get_connection()
+    conn = product_db.get_connection()
     cur = conn.cursor(dictionary=True)
     cur.execute(
         "SELECT item_id, quantity FROM cart WHERE buyer_id=%s",
@@ -216,8 +245,21 @@ def save_cart(buyer_id):
 
 
 def provide_item_feedback(item_id, feedback):
-    conn = db.get_connection()
+    if not isinstance(item_id, int) or item_id <= 0:
+        return False, "Item ID must be a positive integer"
+    if feedback not in ("up", "down"):
+        return False, "Feedback must be either 'up' or 'down'"
+    conn = product_db.get_connection()
     cur = conn.cursor()
+    cur.execute(
+        "SELECT item_id FROM items WHERE item_id=%s",
+        (item_id,),
+    )
+    row = cur.fetchone()
+    if not row:
+        cur.close()
+        conn.close()
+        return False, "Item not found"
     if feedback == "up":
         cur.execute(
             "UPDATE items SET thumbs_up = thumbs_up + 1 WHERE item_id=%s",
@@ -230,10 +272,13 @@ def provide_item_feedback(item_id, feedback):
         )
     cur.close()
     conn.close()
+    return True, "Feedback recorded"
 
 
 def get_seller_rating(seller_id):
-    conn = db.get_connection()
+    if not isinstance(seller_id, int) or seller_id <= 0:
+        return None
+    conn = customer_db.get_connection()
     cur = conn.cursor(dictionary=True)
     cur.execute(
         "SELECT thumbs_up, thumbs_down FROM sellers WHERE seller_id=%s",
@@ -246,7 +291,7 @@ def get_seller_rating(seller_id):
 
 
 def get_buyer_purchases(buyer_id):
-    conn = db.get_connection()
+    conn = product_db.get_connection()
     cur = conn.cursor(dictionary=True)
     cur.execute(
         "SELECT item_id, timestamp FROM purchases WHERE buyer_id=%s",
