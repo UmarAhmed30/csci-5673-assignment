@@ -186,13 +186,12 @@ class SellerClient:
         6.     register_item_for_sale <item_name> <category> <condition_type> <price> <quantity> <keywords>
         7.     update_units_for_sale <item_id> <quantity>
         8.     change_item_price <item_id> <itemPrice>
-        14.    exit
+        9.     exit
                 """)
 
 
 
 def main():
-    answer = input("> ").strip()
     client = SellerClient()
     client.connect()
     client.repl()
