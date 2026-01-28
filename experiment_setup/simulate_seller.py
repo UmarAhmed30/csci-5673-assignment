@@ -75,4 +75,4 @@ def run_evaluation(num_users):
     print("--- Evaluation Complete ---")
 
 if __name__ == "__main__":
-    run_evaluation(10)
+    run_evaluation(1)
