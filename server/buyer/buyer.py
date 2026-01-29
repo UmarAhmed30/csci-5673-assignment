@@ -68,11 +68,15 @@ class BuyerServer:
         op = req.get("op")
         args = req.get("args", {})
         session_id = req.get("session_id")
+        buyer_id = validate_session(session_id) if session_id else None
         if op == "create_account":
+            if buyer_id:
+                return error("Cannot create account while logged in. Please logout first.")
             return self.handle_create_account(args)
         if op == "login":
+            if buyer_id:
+                return error("Already logged in. Please logout first.")
             return self.handle_login(args)
-        buyer_id = validate_session(session_id)
         if not buyer_id:
             return error("Invalid or expired session")
         touch_session(session_id)
