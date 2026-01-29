@@ -9,3 +9,4 @@ python3 ./server/seller/seller.py
 python3 ./client/seller/seller.py  
 
 python3 experiment_setup/simulate_seller.py
+python3 experiment_setup/simulate_buyer.py

@@ -2,7 +2,7 @@
 
 Initialize the database by executing:
 ```
-mysql -u root -p < database/schema.sql
+mysql -u root -p < db/schema.sql
 ```
 
 Install the required packages:

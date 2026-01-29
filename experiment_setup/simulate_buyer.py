@@ -3,21 +3,23 @@ from pathlib import Path
 import time
 import threading
 import uuid
-sys.path.insert(0, str(Path(__file__).parent.parent))
-from client.seller.seller import SellerClient  
 
-num_api_calls = 1000
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from client.buyer.buyer import BuyerClient  
+
+NUM_API_CALLS = 1000
 
 avg_latencies_per_client = []
 throughputs_per_client = []
 metrics_lock = threading.Lock()
 
-def simulate_seller(idx, thread_barrier, op):
-    client = SellerClient()
+
+def simulate_buyer(idx, thread_barrier, op):
+    client = BuyerClient()
     client.connect()
 
     unique_id = str(uuid.uuid4())[:8]
-    username = f"seller_test_{idx}_{unique_id}"
+    username = f"buyer_test_{idx}_{unique_id}"
     password = username
 
     # Create account
@@ -47,29 +49,27 @@ def simulate_seller(idx, thread_barrier, op):
     thread_barrier.wait()
     start = time.perf_counter()
 
-    # run simulation for 2 operations
-    if op == "display_items_for_sale":
-        for _ in range(num_api_calls):
+    # Api calls
+    if op == "get_seller_rating":
+        for _ in range(NUM_API_CALLS):
             t0 = time.perf_counter()
-            result = client.send("display_items_for_sale")
+            result = client.send("get_seller_rating", {
+                "seller_id": 1
+            })
             t1 = time.perf_counter()
             if result:
                 latencies.append(t1 - t0)
 
-    elif op == "register_item_for_sale":
-        for i in range(num_api_calls):
+    elif op == "search_items":
+        for _ in range(NUM_API_CALLS):
             t0 = time.perf_counter()
-            result = client.send("register_item_for_sale", {
-                "item_name": f"test_{unique_id}_{i}",
-                "category": 1,
-                "condition_type": "new",
-                "price": 1.0,
-                "quantity": 1,
+            result = client.send("search_items", {
                 "keywords": ["test"]
             })
             t1 = time.perf_counter()
             if result:
                 latencies.append(t1 - t0)
+
 
     stop = time.perf_counter()
 
@@ -86,6 +86,7 @@ def simulate_seller(idx, thread_barrier, op):
 
     client.close()
 
+
 def run_evaluation(num_users, op):
     global avg_latencies_per_client, throughputs_per_client
     avg_latencies_per_client = []
@@ -98,7 +99,7 @@ def run_evaluation(num_users, op):
 
     for i in range(num_users):
         t = threading.Thread(
-            target=simulate_seller,
+            target=simulate_buyer,
             args=(i, thread_barrier, op)
         )
         threads.append(t)
@@ -107,13 +108,14 @@ def run_evaluation(num_users, op):
     for t in threads:
         t.join()
 
-    print("\nEvaluation Results")
+    print("\nEvaluation Results (Buyer)")
     if avg_latencies_per_client:
         print(f"Avg Latency: {(sum(avg_latencies_per_client)/len(avg_latencies_per_client))*1000:.2f} ms")
         print(f"Total Throughput: {sum(throughputs_per_client):.2f} ops/sec")
     else:
         print("Evaluation Failed")
 
+
 if __name__ == "__main__":
-    run_evaluation(10, "display_items_for_sale")
-    run_evaluation(10, "register_item_for_sale")
+    run_evaluation(10, "get_seller_rating")
+    run_evaluation(10, "search_items")
