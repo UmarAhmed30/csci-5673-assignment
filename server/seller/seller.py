@@ -133,10 +133,9 @@ class SellerServer:
         return success(msg)
 
     def handle_update_units_for_sale(self, seller_id, args):
-        category_id = args.get("category_id")
-        item_number = args.get("item_number")
+        item_id = args.get("item_id")
         quantity = args.get("quantity")
-        ok, msg = update_units_for_sale(seller_id, category_id, item_number, quantity)
+        ok, msg = update_units_for_sale(seller_id, item_id, quantity)
         if not ok:
             return error(msg)
         return success(msg)
@@ -146,10 +145,9 @@ class SellerServer:
         return success(resp)
 
     def handle_change_item_price(self, seller_id, args):
-        category_id = args.get("category_id")
-        item_number = args.get("item_number")
+        item_id = args.get("item_id")
         price = args.get("price")
-        ok, msg = change_item_price(seller_id, category_id, item_number, price)
+        ok,msg = change_item_price(seller_id, item_id, price)
         if not ok:
             return error(msg)
         return success(msg)

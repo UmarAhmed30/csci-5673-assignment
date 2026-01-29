@@ -149,41 +149,38 @@ class SellerClient:
         print(resp)
 
     def update_units_for_sale(self, parts):
-        if len(parts) != 4:
+        if len(parts) != 3:
             print(
-                "Usage: update_units_for_sale <category_id> <item_number> <quantity_to_remove>"
+                "Usage: update_units_for_sale <item_id> <quantity_to_remove>"
             )
             return
         try:
-            category_id = int(parts[1])
-            item_number = int(parts[2])
-            quantity = int(parts[3])
-            if category_id <= 0 or item_number <= 0:
-                print("Error: Category ID and Item number must be positive integers")
+            item_id = int(parts[1])
+            quantity = int(parts[2])
+            if item_id <= 0:
+                print("Error: Item ID must be a positive integer")
                 return
             if quantity <= 0:
                 print("Error: Quantity to remove must be a positive integer")
                 return
             resp = self.send("update_units_for_sale", {
-                "category_id": category_id,
-                "item_number": item_number,
+                "item_id": item_id,
                 "quantity": int(quantity)
             })
             print(resp)
         except ValueError:
-            print("Error: category_id, item_number, and quantity must be valid integers")
+            print("Error: item_id and quantity must be valid integers")
 
     def change_item_price(self, parts):
-        if len(parts) != 4:
+        if len(parts) != 3:
             print(
-                "Usage: change_item_price <category_id> <item_number> <itemPrice> "
+                "Usage: change_item_price <item_id> <itemPrice> "
             )
             return
-        _, category_id, item_number, price = parts
+        _, item_id, price = parts
 
         resp = self.send("change_item_price", {
-            "category_id": category_id,
-            "item_number": item_number,
+            "item_id": item_id,
             "price": float(price)
         })
 
@@ -198,8 +195,8 @@ Commands:
 4.     get_seller_rating
 5.     display_items_for_sale
 6.     register_item_for_sale <item_name> <category_id> <condition_type> <price> <quantity> <keywords>
-7.     update_units_for_sale <category_id> <item_number> <quantity_to_remove>
-8.     change_item_price <category_id> <item_number> <itemPrice>
+7.     update_units_for_sale <item_id> <quantity_to_remove>
+8.     change_item_price <item_id> <itemPrice>
 9.     exit
         """)
 

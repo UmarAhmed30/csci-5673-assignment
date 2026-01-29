@@ -140,37 +140,32 @@ def register_item_for_sale(seller_id, item_name, item_category, condition_type, 
     conn = product_db.get_connection()
     cur = conn.cursor(dictionary=True)
     cur.execute(
-        "SELECT MAX(item_number) as max_num FROM items WHERE category_id = %s FOR UPDATE",
-        (item_category,),
+        "INSERT INTO items (seller_id, item_name, category, condition_type, price, quantity) VALUES (%s, %s, %s, %s, %s, %s)",
+        (seller_id, item_name,item_category, condition_type, salePrice,quantity),
     )
-    row = cur.fetchone()
-    next_item_number = (row['max_num'] + 1) if row and row['max_num'] is not None else 1
-    print(f"Assigning item_number {next_item_number} for category {item_category}")
-    cur.execute(
-        "INSERT INTO items (category_id, item_number, seller_id, item_name, condition_type, price, quantity) "
-        "VALUES (%s, %s, %s, %s, %s, %s, %s)",
-        (item_category, next_item_number, seller_id, item_name, condition_type, salePrice, quantity),
-    )
-    print(f"Item inserted with ID ({item_category}, {next_item_number})")
+    item_id = cur.lastrowid
+    print(f"Item inserted with ID {item_id}")
+
     insert_keyword_query = """
-    INSERT INTO item_keywords (category_id, item_number, keyword)
-    VALUES (%s, %s, %s);
+    INSERT INTO item_keywords (item_id, keyword)
+    VALUES (%s, %s);
     """
+
     for kw in keywords:
-        cur.execute(insert_keyword_query, (item_category, next_item_number, kw))
-    print(f"{len(keywords)} keywords inserted for item ({item_category}, {next_item_number})")
+        cur.execute(insert_keyword_query, (item_id, kw))
+    
+    print(f"{len(keywords)} keywords inserted for item {item_id}")
     conn.commit()
     cur.close()
     conn.close()
-    return True, {"category_id": item_category, "item_number": next_item_number}
+    return True, {"item_id": item_id}
 
 
 def display_items_for_sale(seller_id):
     conn = product_db.get_connection()
     cur = conn.cursor(dictionary=True)
     cur.execute(
-        "SELECT category_id, item_number, item_name, condition_type, price, quantity, thumbs_up, thumbs_down "
-        "FROM items WHERE seller_id=%s",
+        "SELECT  item_id, item_name, category, condition_type, price, quantity, thumbs_up, thumbs_down from items where seller_id=%s",
         (seller_id,),
     )
     rows = cur.fetchall()
@@ -178,18 +173,16 @@ def display_items_for_sale(seller_id):
     conn.close()
     return rows
 
-def update_units_for_sale(seller_id, category_id, item_number, quantity):
-    if not isinstance(category_id, int) or category_id <= 0:
-        return False, "Category ID must be a positive integer"
-    if not isinstance(item_number, int) or item_number <= 0:
-        return False, "Item number must be a positive integer"
+def update_units_for_sale(seller_id, item_id, quantity):
+    if not isinstance(item_id, int) or item_id <= 0:
+        return False, "Item ID must be a positive integer"
     if not isinstance(quantity, int) or quantity <= 0:
         return False, "Quantity to remove must be a positive integer"
     conn = product_db.get_connection()
     cur = conn.cursor(dictionary=True)
     cur.execute(
-        "SELECT quantity FROM items WHERE category_id=%s AND item_number=%s AND seller_id=%s",
-        (category_id, item_number, seller_id),
+        "SELECT quantity FROM items WHERE category_id=%s AND item_id=%s AND seller_id=%s",
+        (category_id, item_id, seller_id),
     )
     row = cur.fetchone()
     if not row:
@@ -203,22 +196,22 @@ def update_units_for_sale(seller_id, category_id, item_number, quantity):
         return False, f"Cannot remove {quantity} units. Only {current_quantity} available"
     new_quantity = current_quantity - quantity
     cur.execute(
-        "UPDATE items SET quantity=%s WHERE category_id=%s AND item_number=%s AND seller_id=%s",
-        (new_quantity, category_id, item_number, seller_id),
+        "UPDATE items SET quantity=%s WHERE category_id=%s AND item_id=%s AND seller_id=%s",
+        (new_quantity, category_id, item_id, seller_id),
     )
     conn.commit()
     cur.close()
     conn.close()
     return True, f"Removed {quantity} units. New quantity: {new_quantity}"
 
-def change_item_price(seller_id, category_id, item_number, price):
+def change_item_price(seller_id, item_id, price):
     conn = product_db.get_connection()
     cur = conn.cursor(dictionary=True)
     cur.execute(
-        "UPDATE items SET price=%s WHERE category_id=%s AND item_number=%s AND seller_id=%s",
-        (price, category_id, item_number, seller_id),
+        "UPDATE  items SET price=%s WHERE item_id=%s AND seller_id=%s",
+        (price,item_id,seller_id,),
     )
-    print(cur.rowcount, " updated")
+    print(cur.rowcount," updated")
     conn.commit()
     cur.close()
     conn.close()

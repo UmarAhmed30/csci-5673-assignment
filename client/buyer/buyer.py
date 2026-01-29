@@ -134,62 +134,56 @@ class BuyerClient:
         print(resp)
 
     def get_item(self, parts):
-        if len(parts) != 3:
-            print("Usage: get_item <category_id> <item_number>")
+        if len(parts) != 2:
+            print("Usage: get_item <item_id>")
             return
         try:
-            category_id = int(parts[1])
-            item_number = int(parts[2])
-            if category_id <= 0 or item_number <= 0:
-                print("Error: Category ID and Item number must be positive integers")
+            item_id = int(parts[1])
+            if item_id <= 0:
+                print("Error: Item ID must be a positive integer")
                 return
             resp = self.send("get_item", {
-                "category_id": category_id,
-                "item_number": item_number,
+                "item_id": item_id,
             })
             print(resp)
         except ValueError:
-            print("Error: category_id and item_number must be valid integers")
+            print("Error: item_id must be a valid integer")
 
     def add_to_cart(self, parts):
-        if len(parts) != 4:
-            print("Usage: add_to_cart <category_id> <item_number> <qty>")
+        if len(parts) != 3:
+            print("Usage: add_to_cart <item_id> <qty>")
             return
         try:
-            category_id = int(parts[1])
-            item_number = int(parts[2])
-            quantity = int(parts[3])
-            if category_id <= 0 or item_number <= 0 or quantity <= 0:
-                print("Error: Category ID, Item number, and Quantity must be positive integers")
+            item_id = int(parts[1])
+            quantity = int(parts[2])
+            if quantity <= 0:
+                print("Error: Quantity must be a positive integer")
                 return
             resp = self.send("add_to_cart", {
-                "category_id": category_id,
-                "item_number": item_number,
+                "item_id": item_id,
                 "quantity": quantity,
             })
             print(resp)
         except ValueError:
-            print("Error: category_id, item_number, and quantity must be valid integers")
+            print("Error: item_id and quantity must be valid integers")
 
     def remove_from_cart(self, parts):
-        if len(parts) != 4:
-            print("Usage: remove_from_cart <category_id> <item_number> <qty>")
+        if len(parts) != 3:
+            print("Usage: remove_from_cart <item_id> <qty>")
             return
         try:
-            category_id = int(parts[1])
-            item_number = int(parts[2])
-            quantity = int(parts[3])
-            if category_id <= 0 or item_number <= 0 or quantity <= 0:
-                print("Error: Category ID, Item number, and Quantity must be positive integers")
+            item_id = int(parts[1])
+            quantity = int(parts[2])
+            if quantity <= 0:
+                print("Error: Quantity must be a positive integer")
                 return
             resp = self.send("remove_from_cart", {
-                "category_id": category_id,
-                "item_number": item_number,
+                "item_id": item_id,
                 "quantity": quantity,
             })
             print(resp)
         except ValueError:
-            print("Error: category_id, item_number, and quantity must be valid integers")
+            print("Error: item_id and quantity must be valid integers")
 
     def display_cart(self):
         resp = self.send("display_cart")
@@ -204,23 +198,21 @@ class BuyerClient:
         print(resp)
 
     def rate_item(self, parts):
-        if len(parts) != 4 or parts[3] not in ("up", "down"):
-            print("Usage: rate_item <category_id> <item_number> up|down")
+        if len(parts) != 3 or parts[2] not in ("up", "down"):
+            print("Usage: rate_item <item_id> up|down")
             return
         try:
-            category_id = int(parts[1])
-            item_number = int(parts[2])
-            if category_id <= 0 or item_number <= 0:
-                print("Error: Category ID and Item number must be positive integers")
+            item_id = int(parts[1])
+            if item_id <= 0:
+                print("Error: Item ID must be a positive integer")
                 return
             resp = self.send("provide_feedback", {
-                "category_id": category_id,
-                "item_number": item_number,
-                "feedback": parts[3],
+                "item_id": item_id,
+                "feedback": parts[2],
             })
             print(resp)
         except ValueError:
-            print("Error: category_id and item_number must be valid integers")
+            print("Error: item_id must be a valid integer")
 
     def get_seller_rating(self, parts):
         if len(parts) != 2:
@@ -248,14 +240,14 @@ Commands:
 1.     create_account <username> <password>
 2.     login <username> <password>
 3.     logout
-4.     search <category_id> [keywords...]
-5.     get_item <category_id> <item_number>
-6.     add_to_cart <category_id> <item_number> <qty>
-7.     remove_from_cart <category_id> <item_number> <qty>
+4.     search <category> [keywords...]
+5.     get_item <item_id>
+6.     add_to_cart <item_id> <qty>
+7.     remove_from_cart <item_id> <qty>
 8.     display_cart
 9.     clear_cart
 10.    save_cart
-11.    rate_item <category_id> <item_number> up|down
+11.    rate_item <item_id> up|down
 12.    get_seller_rating <seller_id>
 13.    get_purchases
 14.    exit
