@@ -167,17 +167,37 @@ def display_items_for_sale(seller_id):
     return rows
 
 def update_units_for_sale(seller_id, category_id, item_number, quantity):
+    if not isinstance(category_id, int) or category_id <= 0:
+        return False, "Category ID must be a positive integer"
+    if not isinstance(item_number, int) or item_number <= 0:
+        return False, "Item number must be a positive integer"
+    if not isinstance(quantity, int) or quantity <= 0:
+        return False, "Quantity to remove must be a positive integer"
     conn = product_db.get_connection()
     cur = conn.cursor(dictionary=True)
     cur.execute(
-        "UPDATE items SET quantity=%s WHERE category_id=%s AND item_number=%s AND seller_id=%s",
-        (quantity, category_id, item_number, seller_id),
+        "SELECT quantity FROM items WHERE category_id=%s AND item_number=%s AND seller_id=%s",
+        (category_id, item_number, seller_id),
     )
-    print(cur.rowcount, " updated")
+    row = cur.fetchone()
+    if not row:
+        cur.close()
+        conn.close()
+        return False, "Item not found or does not belong to you"
+    current_quantity = row['quantity']
+    if quantity > current_quantity:
+        cur.close()
+        conn.close()
+        return False, f"Cannot remove {quantity} units. Only {current_quantity} available"
+    new_quantity = current_quantity - quantity
+    cur.execute(
+        "UPDATE items SET quantity=%s WHERE category_id=%s AND item_number=%s AND seller_id=%s",
+        (new_quantity, category_id, item_number, seller_id),
+    )
     conn.commit()
     cur.close()
     conn.close()
-    return True, "UPDATED"
+    return True, f"Removed {quantity} units. New quantity: {new_quantity}"
 
 def change_item_price(seller_id, category_id, item_number, price):
     conn = product_db.get_connection()

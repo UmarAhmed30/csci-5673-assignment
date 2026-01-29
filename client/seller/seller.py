@@ -151,18 +151,27 @@ class SellerClient:
     def update_units_for_sale(self, parts):
         if len(parts) != 4:
             print(
-                "Usage: update_units_for_sale <category_id> <item_number> <quantity> "
+                "Usage: update_units_for_sale <category_id> <item_number> <quantity_to_remove>"
             )
             return
-        _, category_id, item_number, quantity = parts
-
-        resp = self.send("update_units_for_sale", {
-            "category_id": category_id,
-            "item_number": item_number,
-            "quantity": int(quantity)
-        })
-
-        print(resp)
+        try:
+            category_id = int(parts[1])
+            item_number = int(parts[2])
+            quantity = int(parts[3])
+            if category_id <= 0 or item_number <= 0:
+                print("Error: Category ID and Item number must be positive integers")
+                return
+            if quantity <= 0:
+                print("Error: Quantity to remove must be a positive integer")
+                return
+            resp = self.send("update_units_for_sale", {
+                "category_id": category_id,
+                "item_number": item_number,
+                "quantity": int(quantity)
+            })
+            print(resp)
+        except ValueError:
+            print("Error: category_id, item_number, and quantity must be valid integers")
 
     def change_item_price(self, parts):
         if len(parts) != 4:
@@ -189,12 +198,10 @@ Commands:
 4.     get_seller_rating
 5.     display_items_for_sale
 6.     register_item_for_sale <item_name> <category> <condition_type> <price> <quantity> <keywords>
-7.     update_units_for_sale <category_id> <item_number> <quantity>
+7.     update_units_for_sale <category_id> <item_number> <quantity_to_remove>
 8.     change_item_price <category_id> <item_number> <itemPrice>
-9.    exit
-        """)
-
-
+9.     exit
+                """)
 
 def main():
     client = SellerClient()
