@@ -16,6 +16,8 @@ product_db = ProductDBClient()
 
 
 def create_seller(username, password):
+    if len(username) > 32:
+        return None, "Username must be 32 characters or less"
     conn = customer_db.get_connection()
     cur = conn.cursor()
     cur.execute(
@@ -26,7 +28,7 @@ def create_seller(username, password):
     conn.commit()
     cur.close()
     conn.close()
-    return seller_id
+    return seller_id, "OK"
 
 
 def login_seller(username, password):
@@ -117,6 +119,8 @@ def get_seller_rating(seller_id):
     return row
 
 def register_item_for_sale(seller_id, item_name, item_category, condition_type, salePrice, quantity, keywords):
+    if len(item_name) > 32:
+        return False, "Item name must be 32 characters or less"
     for kw in keywords:
         if len(kw) > 8:
             return False, "Keyword length must be <= 8 characters"

@@ -96,8 +96,13 @@ class SellerServer:
         password = args.get("password")
         if not username or not password:
             return error("Missing username or password")
-        seller_id = create_seller(username, password)
-        return success({"seller_id": seller_id})
+        result = create_seller(username, password)
+        if isinstance(result, tuple):
+            seller_id, msg = result
+            if not seller_id:
+                return error(msg)
+            return success({"seller_id": seller_id})
+        return success({"seller_id": result})
 
     def handle_login(self, args):
         username = args.get("username")

@@ -16,6 +16,8 @@ product_db = ProductDBClient()
 
 
 def create_buyer(username, password):
+    if len(username) > 32:
+        return None, "Username must be 32 characters or less"
     conn = customer_db.get_connection()
     cur = conn.cursor()
     cur.execute(
@@ -25,7 +27,7 @@ def create_buyer(username, password):
     buyer_id = cur.lastrowid
     cur.close()
     conn.close()
-    return buyer_id
+    return buyer_id, "OK"
 
 
 def login_buyer(username, password):

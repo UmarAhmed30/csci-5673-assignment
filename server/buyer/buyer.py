@@ -109,8 +109,13 @@ class BuyerServer:
         password = args.get("password")
         if not username or not password:
             return error("Missing username or password")
-        buyer_id = create_buyer(username, password)
-        return success({"buyer_id": buyer_id})
+        result = create_buyer(username, password)
+        if isinstance(result, tuple):
+            buyer_id, msg = result
+            if not buyer_id:
+                return error(msg)
+            return success({"buyer_id": buyer_id})
+        return success({"buyer_id": result})
 
     def handle_login(self, args):
         username = args.get("username")
