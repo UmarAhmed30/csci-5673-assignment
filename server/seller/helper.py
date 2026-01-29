@@ -140,7 +140,7 @@ def register_item_for_sale(seller_id, item_name, item_category, condition_type, 
     conn = product_db.get_connection()
     cur = conn.cursor(dictionary=True)
     cur.execute(
-        "SELECT MAX(item_number) as max_num FROM items WHERE category_id = %s FOR UPDATE",
+        "SELECT MAX(item_number) as max_num FROM items WHERE category_id = %s",
         (item_category,),
     )
     row = cur.fetchone()
