@@ -158,8 +158,10 @@ class BuyerServer:
         return success(cart)
 
     def handle_save_cart(self, buyer_id):
-        save_cart(buyer_id)
-        return success("Cart saved")
+        ok, msg = save_cart(buyer_id)
+        if not ok:
+            return error(msg)
+        return success(msg)
 
     def handle_provide_feedback(self, args):
         item_id = args.get("item_id")

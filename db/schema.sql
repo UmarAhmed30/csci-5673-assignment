@@ -67,6 +67,7 @@ CREATE TABLE cart (
     buyer_id INT,
     item_id INT,
     quantity INT,
+    saved BOOLEAN DEFAULT FALSE,
     PRIMARY KEY (buyer_id, item_id),
     FOREIGN KEY (item_id) REFERENCES items(item_id)
 );

@@ -55,10 +55,29 @@ def login_buyer(username, password):
 
 def logout_session(session_id):
     conn = customer_db.get_connection()
-    cur = conn.cursor()
+    cur = conn.cursor(dictionary=True)
+    cur.execute(
+        "SELECT user_id FROM sessions WHERE session_id=%s AND user_type='buyer'",
+        (session_id,),
+    )
+    row = cur.fetchone()
+    buyer_id = row["user_id"] if row else None
     cur.execute(
         "DELETE FROM sessions WHERE session_id=%s",
         (session_id,),
+    )
+    cur.close()
+    conn.close()
+    if buyer_id:
+        clear_unsaved_cart(buyer_id)
+
+
+def clear_unsaved_cart(buyer_id):
+    conn = product_db.get_connection()
+    cur = conn.cursor()
+    cur.execute(
+        "DELETE FROM cart WHERE buyer_id = %s AND saved = FALSE",
+        (buyer_id,),
     )
     cur.close()
     conn.close()
@@ -168,8 +187,8 @@ def add_to_cart(buyer_id, item_id, qty):
         conn.close()
         return False, f"Insufficient quantity. Available: {available_qty}, In cart: {current_cart_qty}, Requested: {qty}"
     cur.execute(
-        "INSERT INTO cart (buyer_id, item_id, quantity) "
-        "VALUES (%s, %s, %s) "
+        "INSERT INTO cart (buyer_id, item_id, quantity, saved) "
+        "VALUES (%s, %s, %s, FALSE) "
         "ON DUPLICATE KEY UPDATE quantity = quantity + %s",
         (buyer_id, item_id, qty, qty),
     )
@@ -200,7 +219,6 @@ def remove_from_cart(buyer_id, item_id, qty):
         conn.close()
         return False, f"Cannot remove {qty} items. Only {current_qty} in cart"
     if qty == current_qty:
-        # Remove entire entry if removing all items
         cur.execute(
             "DELETE FROM cart WHERE buyer_id=%s AND item_id=%s",
             (buyer_id, item_id),
@@ -231,7 +249,7 @@ def get_cart(buyer_id):
     conn = product_db.get_connection()
     cur = conn.cursor(dictionary=True)
     cur.execute(
-        "SELECT item_id, quantity FROM cart WHERE buyer_id=%s",
+        "SELECT item_id, quantity, saved FROM cart WHERE buyer_id=%s",
         (buyer_id,),
     )
     rows = cur.fetchall()
@@ -241,7 +259,16 @@ def get_cart(buyer_id):
 
 
 def save_cart(buyer_id):
-    return True
+    conn = product_db.get_connection()
+    cur = conn.cursor()
+    cur.execute(
+        "UPDATE cart SET saved = TRUE WHERE buyer_id = %s",
+        (buyer_id,),
+    )
+    rows_affected = cur.rowcount
+    cur.close()
+    conn.close()
+    return True, f"{rows_affected} items saved"
 
 
 def provide_item_feedback(item_id, feedback):
