@@ -108,7 +108,10 @@ class SellerClient:
     def logout(self):
         resp = self.send("logout")
         self.session_id = None
-        print(resp)
+        if resp.get("status") == "ok":
+            print("[OK] Successfully logged out")
+        else:
+            print(resp)
 
     def get_seller_rating(self, parts):
         if len(parts) != 1:

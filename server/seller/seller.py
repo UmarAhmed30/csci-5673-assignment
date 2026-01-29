@@ -113,8 +113,8 @@ class SellerServer:
         return success({"session_id": session_id})
 
     def handle_logout(self, session_id):
-        logout_seller(session_id)
-        return success("Logged out")
+        logout_session(session_id)
+        return success("Successfully logged out")
 
     def handle_get_seller_rating(self, seller_id):
         rating = get_seller_rating(seller_id)

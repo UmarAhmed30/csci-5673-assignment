@@ -116,7 +116,10 @@ class BuyerClient:
     def logout(self):
         resp = self.send("logout")
         self.session_id = None
-        print(resp)
+        if resp.get("status") == "ok":
+            print("[OK] Successfully logged out")
+        else:
+            print(resp)
 
     def search(self, parts):
         if len(parts) < 2:

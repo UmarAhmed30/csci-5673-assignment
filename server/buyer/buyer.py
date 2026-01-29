@@ -127,7 +127,7 @@ class BuyerServer:
 
     def handle_logout(self, session_id):
         logout_session(session_id)
-        return success("Logged out")
+        return success("Successfully logged out. Unsaved cart items have been removed.")
 
     def handle_search(self, args):
         category = args.get("category")
