@@ -15,6 +15,11 @@ This online marketplace consists of six distributed components communicating via
 7. **Security**: Passwords stored in plaintext with basic authentication (to be enhanced in future assignments)
 8. **Error Handling**: Invalid operations return descriptive error messages to clients
 
+## Search Semantics
+
+We adopted a simple **full word** search approach for the item search `SearchItemsForSale`. We created a table **item_keywords** with two fields, namely **item_id** and **keyword** to hold the keywords associated with an item. On the search operation, we **join** this table with the items table and filter the items based on the requested category, availability and the presence of matching keywords. If keywords are provided, only items whose keywords exactly match one or more of the search terms are returned. Otherwise, all the available items within the requested category are returned. This way the search logic is straightforward, efficient and easy to extend based on future needs.
+
+
 ## Current State
 
 ### What Works?
