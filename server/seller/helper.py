@@ -121,6 +121,18 @@ def get_seller_rating(seller_id):
 def register_item_for_sale(seller_id, item_name, item_category, condition_type, salePrice, quantity, keywords):
     if len(item_name) > 32:
         return False, "Item name must be 32 characters or less"
+    try:
+        item_category = int(item_category)
+        quantity = int(quantity)
+        salePrice = float(salePrice)
+    except (ValueError, TypeError):
+        return False, "Invalid category, quantity, or price format"
+    if item_category <= 0:
+        return False, "Category must be a positive integer"
+    if quantity <= 0:
+        return False, "Quantity must be a positive integer"
+    if salePrice <= 0:
+        return False, "Price must be a positive number"
     for kw in keywords:
         if len(kw) > 8:
             return False, "Keyword length must be <= 8 characters"

@@ -248,7 +248,7 @@ Commands:
 1.     create_account <username> <password>
 2.     login <username> <password>
 3.     logout
-4.     search <category> [keywords...]
+4.     search <category_id> [keywords...]
 5.     get_item <category_id> <item_number>
 6.     add_to_cart <category_id> <item_number> <qty>
 7.     remove_from_cart <category_id> <item_number> <qty>

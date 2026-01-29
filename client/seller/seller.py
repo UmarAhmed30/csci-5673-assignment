@@ -197,11 +197,11 @@ Commands:
 3.     logout
 4.     get_seller_rating
 5.     display_items_for_sale
-6.     register_item_for_sale <item_name> <category> <condition_type> <price> <quantity> <keywords>
+6.     register_item_for_sale <item_name> <category_id> <condition_type> <price> <quantity> <keywords>
 7.     update_units_for_sale <category_id> <item_number> <quantity_to_remove>
 8.     change_item_price <category_id> <item_number> <itemPrice>
 9.     exit
-                """)
+        """)
 
 def main():
     client = SellerClient()
