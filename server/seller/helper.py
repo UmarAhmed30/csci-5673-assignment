@@ -116,7 +116,7 @@ def get_seller_rating(seller_id):
     conn.close()
     return row
 
-def register_item_for_sale(seller_id,item_name, item_category, condition_type, salePrice, quantity, keywords):
+def register_item_for_sale(seller_id, item_name, item_category, condition_type, salePrice, quantity, keywords):
     for kw in keywords:
         if len(kw) > 8:
             return False, "Keyword length must be <= 8 characters"
@@ -124,32 +124,37 @@ def register_item_for_sale(seller_id,item_name, item_category, condition_type, s
     conn = product_db.get_connection()
     cur = conn.cursor(dictionary=True)
     cur.execute(
-        "INSERT INTO items (seller_id, item_name, category, condition_type, price, quantity) VALUES (%s, %s, %s, %s, %s, %s)",
-        (seller_id, item_name,item_category, condition_type, salePrice,quantity),
+        "SELECT MAX(item_number) as max_num FROM items WHERE category_id = %s FOR UPDATE",
+        (item_category,),
     )
-    item_id = cur.lastrowid
-    print(f"Item inserted with ID {item_id}")
-
+    row = cur.fetchone()
+    next_item_number = (row['max_num'] + 1) if row and row['max_num'] is not None else 1
+    print(f"Assigning item_number {next_item_number} for category {item_category}")
+    cur.execute(
+        "INSERT INTO items (category_id, item_number, seller_id, item_name, condition_type, price, quantity) "
+        "VALUES (%s, %s, %s, %s, %s, %s, %s)",
+        (item_category, next_item_number, seller_id, item_name, condition_type, salePrice, quantity),
+    )
+    print(f"Item inserted with ID ({item_category}, {next_item_number})")
     insert_keyword_query = """
-    INSERT INTO item_keywords (item_id, keyword)
-    VALUES (%s, %s);
+    INSERT INTO item_keywords (category_id, item_number, keyword)
+    VALUES (%s, %s, %s);
     """
-
     for kw in keywords:
-        cur.execute(insert_keyword_query, (item_id, kw))
-    
-    print(f"{len(keywords)} keywords inserted for item {item_id}")
+        cur.execute(insert_keyword_query, (item_category, next_item_number, kw))
+    print(f"{len(keywords)} keywords inserted for item ({item_category}, {next_item_number})")
     conn.commit()
     cur.close()
     conn.close()
-    return True, {"item_id": item_id}
+    return True, {"category_id": item_category, "item_number": next_item_number}
 
 
 def display_items_for_sale(seller_id):
     conn = product_db.get_connection()
     cur = conn.cursor(dictionary=True)
     cur.execute(
-        "SELECT  item_id, item_name, category, condition_type, price, quantity, thumbs_up, thumbs_down from items where seller_id=%s",
+        "SELECT category_id, item_number, item_name, condition_type, price, quantity, thumbs_up, thumbs_down "
+        "FROM items WHERE seller_id=%s",
         (seller_id,),
     )
     rows = cur.fetchall()
@@ -157,27 +162,27 @@ def display_items_for_sale(seller_id):
     conn.close()
     return rows
 
-def update_units_for_sale(seller_id, item_id, quantity):
+def update_units_for_sale(seller_id, category_id, item_number, quantity):
     conn = product_db.get_connection()
     cur = conn.cursor(dictionary=True)
     cur.execute(
-        "UPDATE  items SET quantity=%s WHERE item_id=%s AND seller_id=%s",
-        (quantity,item_id,seller_id,),
+        "UPDATE items SET quantity=%s WHERE category_id=%s AND item_number=%s AND seller_id=%s",
+        (quantity, category_id, item_number, seller_id),
     )
-    print(cur.rowcount," updated")
+    print(cur.rowcount, " updated")
     conn.commit()
     cur.close()
     conn.close()
     return True, "UPDATED"
 
-def change_item_price(seller_id, item_id, price):
+def change_item_price(seller_id, category_id, item_number, price):
     conn = product_db.get_connection()
     cur = conn.cursor(dictionary=True)
     cur.execute(
-        "UPDATE  items SET price=%s WHERE item_id=%s AND seller_id=%s",
-        (price,item_id,seller_id,),
+        "UPDATE items SET price=%s WHERE category_id=%s AND item_number=%s AND seller_id=%s",
+        (price, category_id, item_number, seller_id),
     )
-    print(cur.rowcount," updated")
+    print(cur.rowcount, " updated")
     conn.commit()
     cur.close()
     conn.close()

@@ -127,24 +127,27 @@ class BuyerServer:
         return success(results)
 
     def handle_get_item(self, args):
-        item_id = args.get("item_id")
-        item = get_item(item_id)
+        category_id = args.get("category_id")
+        item_number = args.get("item_number")
+        item = get_item(category_id, item_number)
         if not item:
             return error("Item not found")
         return success(item)
 
     def handle_add_to_cart(self, buyer_id, args):
-        item_id = args.get("item_id")
+        category_id = args.get("category_id")
+        item_number = args.get("item_number")
         qty = args.get("quantity")
-        ok, msg = add_to_cart(buyer_id, item_id, qty)
+        ok, msg = add_to_cart(buyer_id, category_id, item_number, qty)
         if not ok:
             return error(msg)
         return success("Item added to cart")
 
     def handle_remove_from_cart(self, buyer_id, args):
-        item_id = args.get("item_id")
+        category_id = args.get("category_id")
+        item_number = args.get("item_number")
         qty = args.get("quantity")
-        ok, msg = remove_from_cart(buyer_id, item_id, qty)
+        ok, msg = remove_from_cart(buyer_id, category_id, item_number, qty)
         if not ok:
             return error(msg)
         return success("Item removed from cart")
@@ -164,9 +167,10 @@ class BuyerServer:
         return success(msg)
 
     def handle_provide_feedback(self, args):
-        item_id = args.get("item_id")
+        category_id = args.get("category_id")
+        item_number = args.get("item_number")
         feedback = args.get("feedback")
-        ok, msg = provide_item_feedback(item_id, feedback)
+        ok, msg = provide_item_feedback(category_id, item_number, feedback)
         if not ok:
             return error(msg)
         return success(msg)

@@ -146,30 +146,32 @@ class SellerClient:
         print(resp)
 
     def update_units_for_sale(self, parts):
-        if len(parts) != 3:
+        if len(parts) != 4:
             print(
-                "Usage: update_units_for_sale <item_id> <quantity> "
+                "Usage: update_units_for_sale <category_id> <item_number> <quantity> "
             )
             return
-        _, item_id, quantity = parts
+        _, category_id, item_number, quantity = parts
 
         resp = self.send("update_units_for_sale", {
-            "item_id": item_id,
+            "category_id": category_id,
+            "item_number": item_number,
             "quantity": int(quantity)
         })
 
         print(resp)
 
     def change_item_price(self, parts):
-        if len(parts) != 3:
+        if len(parts) != 4:
             print(
-                "Usage: change_item_price <item_id> <itemPrice> "
+                "Usage: change_item_price <category_id> <item_number> <itemPrice> "
             )
             return
-        _, item_id, price = parts
+        _, category_id, item_number, price = parts
 
         resp = self.send("change_item_price", {
-            "item_id": item_id,
+            "category_id": category_id,
+            "item_number": item_number,
             "price": float(price)
         })
 
@@ -177,17 +179,17 @@ class SellerClient:
 
     def print_help(self):
         print("""
-        Commands:
-        1.     create_account <username> <password>
-        2.     login <username> <password>
-        3.     logout
-        4.     get_seller_rating
-        5.     display_items_for_sale
-        6.     register_item_for_sale <item_name> <category> <condition_type> <price> <quantity> <keywords>
-        7.     update_units_for_sale <item_id> <quantity>
-        8.     change_item_price <item_id> <itemPrice>
-        9.     exit
-                """)
+Commands:
+1.     create_account <username> <password>
+2.     login <username> <password>
+3.     logout
+4.     get_seller_rating
+5.     display_items_for_sale
+6.     register_item_for_sale <item_name> <category> <condition_type> <price> <quantity> <keywords>
+7.     update_units_for_sale <category_id> <item_number> <quantity>
+8.     change_item_price <category_id> <item_number> <itemPrice>
+9.    exit
+        """)
 
 
 
