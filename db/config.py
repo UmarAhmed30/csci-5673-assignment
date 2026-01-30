@@ -9,7 +9,7 @@ CUSTOMER_DB_CONFIG = {
     "user": os.getenv("CUSTOMER_DB_USER"),
     "password": os.getenv("CUSTOMER_DB_PASSWORD"),
     "database": os.getenv("CUSTOMER_DB_NAME"),
-    "pool_size": 10
+    "pool_size": 150,
 }
 
 PRODUCT_DB_CONFIG = {
@@ -18,5 +18,5 @@ PRODUCT_DB_CONFIG = {
     "user": os.getenv("PRODUCT_DB_USER"),
     "password": os.getenv("PRODUCT_DB_PASSWORD"),
     "database": os.getenv("PRODUCT_DB_NAME"),
-    "pool_size": 10
+    "pool_size": 150,
 }

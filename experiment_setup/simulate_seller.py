@@ -56,6 +56,15 @@ def simulate_seller(idx, thread_barrier, op):
             if result:
                 latencies.append(t1 - t0)
 
+    # run simulation for 2 operations
+    elif op == "get_seller_rating":
+        for _ in range(num_api_calls):
+            t0 = time.perf_counter()
+            result = client.send("get_seller_rating")
+            t1 = time.perf_counter()
+            if result:
+                latencies.append(t1 - t0)
+                
     elif op == "register_item_for_sale":
         for i in range(num_api_calls):
             t0 = time.perf_counter()
