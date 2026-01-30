@@ -7,6 +7,12 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from db.config import CUSTOMER_DB_CONFIG, PRODUCT_DB_CONFIG
 
+pooling.CNX_POOL_MAXSIZE = max(
+    getattr(pooling, "CNX_POOL_MAXSIZE", 150),
+    CUSTOMER_DB_CONFIG["pool_size"],
+    PRODUCT_DB_CONFIG["pool_size"],
+)
+
 class CustomerDBClient:
     """Database client for Customer Database (buyers, sellers, sessions)"""
     def __init__(self):
