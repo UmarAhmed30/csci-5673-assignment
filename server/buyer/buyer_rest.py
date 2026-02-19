@@ -10,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Literal
 import mysql.connector
+from zeep import Client as SoapClient
 
 from server.buyer.helper import (
     create_buyer,
@@ -165,6 +166,13 @@ class RemoveFromCartRequest(BaseModel):
 
 class FeedbackRequest(BaseModel):
     feedback: Literal["up", "down"]
+
+
+class PurchaseRequest(BaseModel):
+    card_holder_name: str
+    card_number: str
+    expiration_date: str
+    security_code: str
 
 
 @app.post("/api/buyers/register", status_code=201, response_model=AuthResponse)
@@ -403,6 +411,72 @@ async def save_cart_endpoint(buyer_id: int = Depends(get_current_buyer)):
         raise
     except Exception as e:
         logger.error(f"Unexpected error during save cart: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail="An unexpected error occurred")
+
+
+@app.post("/api/purchases", status_code=201)
+async def make_purchase(
+    request: PurchaseRequest,
+    buyer_id: int = Depends(get_current_buyer)
+):
+    try:
+        logger.info(f"Purchase request from buyer_id: {buyer_id}")
+        cart_items = get_cart(buyer_id)
+        if not cart_items:
+            logger.warning(f"Purchase failed: Empty cart for buyer_id={buyer_id}")
+            raise HTTPException(status_code=400, detail="Cart is empty")
+        if not request.card_holder_name or not request.card_number or not request.expiration_date or not request.security_code:
+            logger.warning("Purchase failed: Missing credit card information")
+            raise HTTPException(status_code=400, detail="All credit card fields are required")
+        try:
+            soap_client = SoapClient('http://localhost:8002/?wsdl')
+            result = soap_client.service.process_transaction(
+                card_holder_name=request.card_holder_name,
+                card_number=request.card_number,
+                expiration_date=request.expiration_date,
+                security_code=request.security_code
+            )
+            if result != "Yes":
+                logger.warning(f"Purchase failed: Transaction declined for buyer_id={buyer_id}")
+                raise HTTPException(status_code=402, detail="Payment declined. Please check your card details and try again.")
+            logger.info(f"Transaction approved for buyer_id={buyer_id}")
+        except Exception as e:
+            logger.error(f"Financial service error: {str(e)}", exc_info=True)
+            raise HTTPException(status_code=503, detail="Financial service unavailable. Please try again later.")
+        success, message = save_cart(buyer_id)
+        if not success:
+            logger.warning(f"Purchase failed: {message}")
+            raise HTTPException(status_code=400, detail=message)
+        from db.client import ProductDBClient
+        product_db = ProductDBClient()
+        conn = product_db.get_connection()
+        cur = conn.cursor()
+        try:
+            for item in cart_items:
+                cur.execute(
+                    "INSERT INTO purchases (buyer_id, item_id) VALUES (%s, %s)",
+                    (buyer_id, item["item_id"])
+                )
+                # Decrease item quantity
+                cur.execute(
+                    "UPDATE items SET quantity = quantity - %s WHERE item_id = %s",
+                    (item["quantity"], item["item_id"])
+                )
+            conn.commit()
+            clear_cart(buyer_id)
+            logger.info(f"Purchase successful: buyer_id={buyer_id}, items={len(cart_items)}")
+            return {"message": "Purchase completed successfully", "items_purchased": len(cart_items)}
+        except Exception as e:
+            conn.rollback()
+            logger.error(f"Database error during purchase: {str(e)}", exc_info=True)
+            raise HTTPException(status_code=500, detail="Failed to record purchase")
+        finally:
+            cur.close()
+            conn.close()
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error during purchase: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail="An unexpected error occurred")
 
 

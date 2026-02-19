@@ -335,3 +335,24 @@ def get_buyer_purchases(buyer_id):
     cur.close()
     conn.close()
     return rows
+
+
+def make_purchase(buyer_id, cart_items):
+    """Record purchase in database"""
+    conn = product_db.get_connection()
+    cur = conn.cursor()
+    try:
+        for item in cart_items:
+            cur.execute(
+                "INSERT INTO purchases (buyer_id, item_id) VALUES (%s, %s)",
+                (buyer_id, item["item_id"])
+            )
+        conn.commit()
+        cur.close()
+        conn.close()
+        return True, f"{len(cart_items)} items purchased"
+    except Exception as e:
+        conn.rollback()
+        cur.close()
+        conn.close()
+        return False, str(e)
