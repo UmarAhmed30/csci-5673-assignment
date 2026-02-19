@@ -7,18 +7,18 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from db.config import CUSTOMER_DB_CONFIG, PRODUCT_DB_CONFIG
 
-pooling.CNX_POOL_MAXSIZE = max(
-    getattr(pooling, "CNX_POOL_MAXSIZE", 150),
-    CUSTOMER_DB_CONFIG["pool_size"],
-    PRODUCT_DB_CONFIG["pool_size"],
-)
+# pooling.CNX_POOL_MAXSIZE = max(
+#     getattr(pooling, "CNX_POOL_MAXSIZE", 150),
+#     CUSTOMER_DB_CONFIG["pool_size"],
+#     PRODUCT_DB_CONFIG["pool_size"],
+# )
 
 class CustomerDBClient:
     """Database client for Customer Database (buyers, sellers, sessions)"""
     def __init__(self):
         self.pool = pooling.MySQLConnectionPool(
             pool_name="customer_db_pool",
-            pool_size=CUSTOMER_DB_CONFIG["pool_size"],
+            # pool_size=CUSTOMER_DB_CONFIG["pool_size"],
             host=CUSTOMER_DB_CONFIG["host"],
             port=CUSTOMER_DB_CONFIG["port"],
             user=CUSTOMER_DB_CONFIG["user"],
@@ -35,7 +35,7 @@ class ProductDBClient:
     def __init__(self):
         self.pool = pooling.MySQLConnectionPool(
             pool_name="product_db_pool",
-            pool_size=PRODUCT_DB_CONFIG["pool_size"],
+            # pool_size=PRODUCT_DB_CONFIG["pool_size"],
             host=PRODUCT_DB_CONFIG["host"],
             port=PRODUCT_DB_CONFIG["port"],
             user=PRODUCT_DB_CONFIG["user"],
