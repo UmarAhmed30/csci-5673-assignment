@@ -191,7 +191,7 @@ def add_to_cart(buyer_id, item_id, qty):
     cur.execute(
         "INSERT INTO cart (buyer_id, item_id, quantity, saved) "
         "VALUES (%s, %s, %s, FALSE) "
-        "ON DUPLICATE KEY UPDATE quantity = quantity + %s",
+        "ON DUPLICATE KEY UPDATE quantity = quantity + %s, saved = FALSE",
         (buyer_id, item_id, qty, qty),
     )
     cur.close()
@@ -227,7 +227,7 @@ def remove_from_cart(buyer_id, item_id, qty):
         )
     else:
         cur.execute(
-            "UPDATE cart SET quantity = quantity - %s "
+            "UPDATE cart SET quantity = quantity - %s, saved = FALSE "
             "WHERE buyer_id=%s AND item_id=%s",
             (qty, buyer_id, item_id),
         )
