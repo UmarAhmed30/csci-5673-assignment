@@ -181,7 +181,7 @@ class BuyerClient:
             if items:
                 print(f"[OK] Found {len(items)} items:")
                 for item in items:
-                    print(f"  - Item ID: {item.get('item_id')}, Name: {item.get('name')}, Price: ${item.get('price')}, Quantity: {item.get('quantity')}")
+                    print(f"  - Item ID: {item.get('item_id')}, Name: {item.get('item_name')}, Price: ${item.get('price')}, Quantity: {item.get('quantity')}")
             else:
                 print("[OK] No items found")
         else:
@@ -255,7 +255,8 @@ class BuyerClient:
             if cart:
                 print(f"[OK] Cart contains {len(cart)} items:")
                 for item in cart:
-                    print(f"  - Item ID: {item.get('item_id')}, Name: {item.get('name')}, Quantity: {item.get('quantity')}, Price: ${item.get('price')}")
+                    # Cart items only have item_id, quantity, and saved - no name or price
+                    print(f"  - Item ID: {item.get('item_id')}, Quantity: {item.get('quantity')}, Saved: {item.get('saved')}")
             else:
                 print("[OK] Cart is empty")
         else:
@@ -269,11 +270,11 @@ class BuyerClient:
             print(f"[ERROR] {resp.get('message', 'Failed to clear cart')}")
 
     def save_cart(self):
-        resp = self.send("POST", "/api/cart/checkout")
+        resp = self.send("POST", "/api/cart/save")
         if resp["status"] == "ok":
-            print(f"[OK] {resp['data'].get('message', 'Checkout successful')}")
+            print(f"[OK] {resp['data'].get('message', 'Cart saved successfully')}")
         else:
-            print(f"[ERROR] {resp.get('message', 'Checkout failed')}")
+            print(f"[ERROR] {resp.get('message', 'Failed to save cart')}")
 
     def rate_item(self, parts):
         if len(parts) != 3 or parts[2] not in ("up", "down"):

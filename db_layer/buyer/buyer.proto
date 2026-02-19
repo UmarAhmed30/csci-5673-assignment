@@ -1,0 +1,184 @@
+syntax = "proto3";
+
+package buyer;
+
+service BuyerService {
+  rpc CreateBuyer          (CreateBuyerRequest)          returns (CreateBuyerResponse);
+  rpc LoginBuyer           (LoginBuyerRequest)           returns (LoginBuyerResponse);
+  rpc LogoutBuyer          (LogoutBuyerRequest)          returns (LogoutBuyerResponse);
+  rpc ValidateSession      (ValidateSessionRequest)      returns (ValidateSessionResponse);
+  rpc TouchSession         (TouchSessionRequest)         returns (TouchSessionResponse);
+  rpc SearchItems          (SearchItemsRequest)          returns (SearchItemsResponse);
+  rpc GetItem              (GetItemRequest)              returns (GetItemResponse);
+  rpc AddToCart            (AddToCartRequest)            returns (AddToCartResponse);
+  rpc RemoveFromCart       (RemoveFromCartRequest)        returns (RemoveFromCartResponse);
+  rpc GetCart              (GetCartRequest)              returns (GetCartResponse);
+  rpc ClearCart            (ClearCartRequest)             returns (ClearCartResponse);
+  rpc SaveCart             (SaveCartRequest)              returns (SaveCartResponse);
+  rpc ProvideItemFeedback  (ProvideItemFeedbackRequest)   returns (ProvideItemFeedbackResponse);
+  rpc GetSellerRating       (GetSellerRatingRequest)      returns (GetSellerRatingResponse);
+  rpc GetBuyerPurchases     (GetBuyerPurchasesRequest)    returns (GetBuyerPurchasesResponse);
+  rpc MakePurchase          (MakePurchaseRequest)         returns (MakePurchaseResponse);
+}
+
+// CreateBuyer
+message CreateBuyerRequest {
+  string username = 1;
+  string password = 2;
+}
+message CreateBuyerResponse {
+  int32  buyer_id = 1;
+  string message  = 2;
+}
+
+// LoginBuyer
+message LoginBuyerRequest {
+  string username = 1;
+  string password = 2;
+}
+message LoginBuyerResponse {
+  string session_id = 1; // empty string if failed
+}
+
+// LogoutBuyer
+message LogoutBuyerRequest {
+  string session_id = 1;
+}
+message LogoutBuyerResponse {}
+
+// ValidateSession
+message ValidateSessionRequest {
+  string session_id = 1;
+}
+message ValidateSessionResponse {
+  int32 user_id = 1; // 0 if invalid
+}
+
+// TouchSession
+message TouchSessionRequest {
+  string session_id = 1;
+}
+message TouchSessionResponse {}
+
+// SearchItems
+message SearchItemsRequest {
+  int32  category = 1;
+  repeated string keywords = 2;
+}
+message Item {
+  int32  item_id        = 1;
+  string item_name      = 2;
+  int32  category       = 3;
+  string condition_type = 4;
+  double price          = 5;
+  int32  quantity       = 6;
+  int32  thumbs_up      = 7;
+  int32  thumbs_down    = 8;
+}
+message SearchItemsResponse {
+  repeated Item items = 1;
+}
+
+// GetItem
+message GetItemRequest {
+  int32 item_id = 1;
+}
+message GetItemResponse {
+  bool success = 1;
+  Item item = 2;
+  string message = 3;
+}
+
+// AddToCart
+message AddToCartRequest {
+  int32 buyer_id = 1;
+  int32 item_id  = 2;
+  int32 quantity = 3;
+}
+message AddToCartResponse {
+  bool   success = 1;
+  string message = 2;
+}
+
+// RemoveFromCart
+message RemoveFromCartRequest {
+  int32 buyer_id = 1;
+  int32 item_id  = 2;
+  int32 quantity = 3;
+}
+message RemoveFromCartResponse {
+  bool   success = 1;
+  string message = 2;
+}
+
+// GetCart
+message GetCartRequest {
+  int32 buyer_id = 1;
+}
+message CartItem {
+  int32 item_id  = 1;
+  int32 quantity = 2;
+  bool  saved    = 3;
+}
+message GetCartResponse {
+  repeated CartItem items = 1;
+}
+
+// ClearCart
+message ClearCartRequest {
+  int32 buyer_id = 1;
+}
+message ClearCartResponse {}
+
+// SaveCart
+message SaveCartRequest {
+  int32 buyer_id = 1;
+}
+message SaveCartResponse {
+  bool   success = 1;
+  string message = 2;
+}
+
+// ProvideItemFeedback
+message ProvideItemFeedbackRequest {
+  int32  item_id  = 1;
+  string feedback = 2; // "up" or "down"
+}
+message ProvideItemFeedbackResponse {
+  bool   success = 1;
+  string message = 2;
+}
+
+// GetSellerRating
+message GetSellerRatingRequest {
+  int32 seller_id = 1;
+}
+message GetSellerRatingResponse {
+  bool   success     = 1;
+  int32  thumbs_up    = 2;
+  int32  thumbs_down  = 3;
+  string message      = 4;
+}
+
+// GetBuyerPurchases
+message GetBuyerPurchasesRequest {
+  int32 buyer_id = 1;
+}
+message Purchase {
+  int32  item_id   = 1;
+  string timestamp = 2;
+}
+message GetBuyerPurchasesResponse {
+  repeated Purchase purchases = 1;
+}
+
+// MakePurchase
+message MakePurchaseRequest {
+  int32  buyer_id = 1;
+  repeated CartItem cart_items = 2;
+}
+message MakePurchaseResponse {
+  bool   success = 1;
+  string message = 2;
+  int32  items_purchased = 3;
+}
