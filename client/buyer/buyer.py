@@ -1,10 +1,9 @@
-import socket
 import sys
 from pathlib import Path
+import requests
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from utils.helper import send_msg, recv_msg
 from server.buyer.config import BUYER_SERVER_CONFIG
 
 SERVER_HOST = BUYER_SERVER_CONFIG["host"]
@@ -15,28 +14,69 @@ class BuyerClient:
     def __init__(self, host=SERVER_HOST, port=SERVER_PORT):
         self.host = host
         self.port = port
-        self.sock = None
-        self.session_id = None
+        self.session = None
+        self.session_token = None
+        self.base_url = f"http://{host}:{port}"
 
     def connect(self):
-        self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.sock.connect((self.host, self.port))
+        self.session = requests.Session()
         print("[BUYER][CLIENT] Connected to buyer server")
 
     def close(self):
-        if self.sock:
-            self.sock.close()
-            self.sock = None
+        if self.session:
+            self.session.close()
+            self.session = None
 
-    def send(self, op, args=None):
-        msg = {"op": op}
-        if args:
-            msg["args"] = args
-        if self.session_id:
-            msg["session_id"] = self.session_id
-        send_msg(self.sock, msg)
-        resp = recv_msg(self.sock)
-        return resp
+    def send(self, method, endpoint, json_data=None):
+        url = f"{self.base_url}{endpoint}"
+        headers = {}
+
+        # Include session token in Authorization header if authenticated
+        if self.session_token:
+            headers["Authorization"] = f"Bearer {self.session_token}"
+
+        try:
+            if method == "GET":
+                response = self.session.get(url, headers=headers, params=json_data)
+            elif method == "POST":
+                response = self.session.post(url, headers=headers, json=json_data)
+            elif method == "PUT":
+                response = self.session.put(url, headers=headers, json=json_data)
+            elif method == "DELETE":
+                response = self.session.delete(url, headers=headers, json=json_data)
+            else:
+                return {"status": "error", "message": f"Unsupported HTTP method: {method}"}
+
+            try:
+                data = response.json()
+            except:
+                data = {"message": response.text}
+
+            if response.status_code in [200, 201]:
+                return {"status": "ok", "data": data}
+            elif response.status_code == 400:
+                return {"status": "error", "message": data.get("detail", "Bad request")}
+            elif response.status_code == 401:
+                return {"status": "error", "message": data.get("detail", "Unauthorized")}
+            elif response.status_code == 403:
+                return {"status": "error", "message": data.get("detail", "Forbidden")}
+            elif response.status_code == 404:
+                return {"status": "error", "message": data.get("detail", "Not found")}
+            elif response.status_code == 409:
+                return {"status": "error", "message": data.get("detail", "Conflict")}
+            elif response.status_code == 422:
+                return {"status": "error", "message": data.get("detail", "Validation error")}
+            elif response.status_code >= 500:
+                return {"status": "error", "message": data.get("detail", "Server error")}
+            else:
+                return {"status": "error", "message": f"Unexpected status code: {response.status_code}"}
+
+        except requests.exceptions.ConnectionError:
+            return {"status": "error", "message": "Failed to connect to server"}
+        except requests.exceptions.Timeout:
+            return {"status": "error", "message": "Request timeout"}
+        except Exception as e:
+            return {"status": "error", "message": f"Request failed: {str(e)}"}
 
     def repl(self):
         print("\nBuyer CLI")
@@ -93,45 +133,59 @@ class BuyerClient:
         if len(parts) != 3:
             print("Usage: create_account <username> <password>")
             return
-        resp = self.send("create_account", {
+        resp = self.send("POST", "/api/buyers/register", {
             "username": parts[1],
             "password": parts[2],
         })
-        print(resp)
+        if resp["status"] == "ok":
+            print(f"[OK] {resp['data'].get('message', 'Account created')}")
+        else:
+            print(f"[ERROR] {resp.get('message', 'Unknown error')}")
 
     def login(self, parts):
         if len(parts) != 3:
             print("Usage: login <username> <password>")
             return
-        resp = self.send("login", {
+        resp = self.send("POST", "/api/buyers/login", {
             "username": parts[1],
             "password": parts[2],
         })
         if resp["status"] == "ok":
-            self.session_id = resp["data"]["session_id"]
+            self.session_token = resp["data"].get("token")
             print("[OK] Logged in")
         else:
-            print(resp)
+            print(f"[ERROR] {resp.get('message', 'Login failed')}")
 
     def logout(self):
-        resp = self.send("logout")
-        self.session_id = None
+        resp = self.send("POST", "/api/buyers/logout")
+        self.session_token = None
         if resp.get("status") == "ok":
             print("[OK] Successfully logged out")
         else:
-            print(resp)
+            print(f"[ERROR] {resp.get('message', 'Logout failed')}")
 
     def search(self, parts):
         if len(parts) < 2:
             print("Usage: search <category> [keywords...]")
             return
-        category = int(parts[1])
-        keywords = parts[2:]
-        resp = self.send("search", {
-            "category": category,
-            "keywords": keywords,
-        })
-        print(resp)
+        category = parts[1]
+        keywords = ",".join(parts[2:]) if len(parts) > 2 else None
+
+        params = {"category": category}
+        if keywords:
+            params["keywords"] = keywords
+
+        resp = self.send("GET", "/api/items/search", params)
+        if resp["status"] == "ok":
+            items = resp["data"].get("items", [])
+            if items:
+                print(f"[OK] Found {len(items)} items:")
+                for item in items:
+                    print(f"  - Item ID: {item.get('item_id')}, Name: {item.get('name')}, Price: ${item.get('price')}, Quantity: {item.get('quantity')}")
+            else:
+                print("[OK] No items found")
+        else:
+            print(f"[ERROR] {resp.get('message', 'Search failed')}")
 
     def get_item(self, parts):
         if len(parts) != 2:
@@ -142,10 +196,14 @@ class BuyerClient:
             if item_id <= 0:
                 print("Error: Item ID must be a positive integer")
                 return
-            resp = self.send("get_item", {
-                "item_id": item_id,
-            })
-            print(resp)
+            resp = self.send("GET", f"/api/items/{item_id}")
+            if resp["status"] == "ok":
+                item = resp["data"].get("item", {})
+                print(f"[OK] Item details:")
+                for key, value in item.items():
+                    print(f"  {key}: {value}")
+            else:
+                print(f"[ERROR] {resp.get('message', 'Failed to get item')}")
         except ValueError:
             print("Error: item_id must be a valid integer")
 
@@ -159,11 +217,14 @@ class BuyerClient:
             if quantity <= 0:
                 print("Error: Quantity must be a positive integer")
                 return
-            resp = self.send("add_to_cart", {
+            resp = self.send("POST", "/api/cart/items", {
                 "item_id": item_id,
                 "quantity": quantity,
             })
-            print(resp)
+            if resp["status"] == "ok":
+                print(f"[OK] {resp['data'].get('message', 'Item added to cart')}")
+            else:
+                print(f"[ERROR] {resp.get('message', 'Failed to add to cart')}")
         except ValueError:
             print("Error: item_id and quantity must be valid integers")
 
@@ -177,25 +238,42 @@ class BuyerClient:
             if quantity <= 0:
                 print("Error: Quantity must be a positive integer")
                 return
-            resp = self.send("remove_from_cart", {
-                "item_id": item_id,
+            resp = self.send("DELETE", f"/api/cart/items/{item_id}", {
                 "quantity": quantity,
             })
-            print(resp)
+            if resp["status"] == "ok":
+                print(f"[OK] {resp['data'].get('message', 'Item removed from cart')}")
+            else:
+                print(f"[ERROR] {resp.get('message', 'Failed to remove from cart')}")
         except ValueError:
             print("Error: item_id and quantity must be valid integers")
 
     def display_cart(self):
-        resp = self.send("display_cart")
-        print(resp)
+        resp = self.send("GET", "/api/cart")
+        if resp["status"] == "ok":
+            cart = resp["data"].get("cart", [])
+            if cart:
+                print(f"[OK] Cart contains {len(cart)} items:")
+                for item in cart:
+                    print(f"  - Item ID: {item.get('item_id')}, Name: {item.get('name')}, Quantity: {item.get('quantity')}, Price: ${item.get('price')}")
+            else:
+                print("[OK] Cart is empty")
+        else:
+            print(f"[ERROR] {resp.get('message', 'Failed to display cart')}")
 
     def clear_cart(self):
-        resp = self.send("clear_cart")
-        print(resp)
+        resp = self.send("DELETE", "/api/cart")
+        if resp["status"] == "ok":
+            print(f"[OK] {resp['data'].get('message', 'Cart cleared')}")
+        else:
+            print(f"[ERROR] {resp.get('message', 'Failed to clear cart')}")
 
     def save_cart(self):
-        resp = self.send("save_cart")
-        print(resp)
+        resp = self.send("POST", "/api/cart/checkout")
+        if resp["status"] == "ok":
+            print(f"[OK] {resp['data'].get('message', 'Checkout successful')}")
+        else:
+            print(f"[ERROR] {resp.get('message', 'Checkout failed')}")
 
     def rate_item(self, parts):
         if len(parts) != 3 or parts[2] not in ("up", "down"):
@@ -206,11 +284,13 @@ class BuyerClient:
             if item_id <= 0:
                 print("Error: Item ID must be a positive integer")
                 return
-            resp = self.send("provide_feedback", {
-                "item_id": item_id,
+            resp = self.send("POST", f"/api/items/{item_id}/feedback", {
                 "feedback": parts[2],
             })
-            print(resp)
+            if resp["status"] == "ok":
+                print(f"[OK] {resp['data'].get('message', 'Feedback recorded')}")
+            else:
+                print(f"[ERROR] {resp.get('message', 'Failed to provide feedback')}")
         except ValueError:
             print("Error: item_id must be a valid integer")
 
@@ -223,16 +303,29 @@ class BuyerClient:
             if seller_id <= 0:
                 print("Error: Seller ID must be a positive integer")
                 return
-            resp = self.send("get_seller_rating", {
-                "seller_id": seller_id,
-            })
-            print(resp)
+            resp = self.send("GET", f"/api/sellers/{seller_id}/rating")
+            if resp["status"] == "ok":
+                rating = resp["data"].get("rating", {})
+                print(f"[OK] Seller rating:")
+                for key, value in rating.items():
+                    print(f"  {key}: {value}")
+            else:
+                print(f"[ERROR] {resp.get('message', 'Failed to get seller rating')}")
         except ValueError:
             print("Error: seller_id must be a valid integer")
 
     def get_purchases(self):
-        resp = self.send("get_buyer_purchases")
-        print(resp)
+        resp = self.send("GET", "/api/buyers/purchases")
+        if resp["status"] == "ok":
+            purchases = resp["data"].get("purchases", [])
+            if purchases:
+                print(f"[OK] Purchase history ({len(purchases)} items):")
+                for purchase in purchases:
+                    print(f"  - {purchase}")
+            else:
+                print("[OK] No purchase history")
+        else:
+            print(f"[ERROR] {resp.get('message', 'Failed to get purchases')}")
 
     def print_help(self):
         print("""

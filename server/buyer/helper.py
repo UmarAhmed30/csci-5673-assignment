@@ -20,14 +20,19 @@ def create_buyer(username, password):
         return None, "Username must be 32 characters or less"
     conn = customer_db.get_connection()
     cur = conn.cursor()
-    cur.execute(
-        "INSERT INTO buyers (buyer_name, password) VALUES (%s, %s)",
-        (username, password),
-    )
-    buyer_id = cur.lastrowid
-    cur.close()
-    conn.close()
-    return buyer_id, "OK"
+    try:
+        cur.execute(
+            "INSERT INTO buyers (buyer_name, password) VALUES (%s, %s)",
+            (username, password),
+        )
+        buyer_id = cur.lastrowid
+        cur.close()
+        conn.close()
+        return buyer_id, "OK"
+    except Exception as e:
+        cur.close()
+        conn.close()
+        raise
 
 
 def login_buyer(username, password):
@@ -105,7 +110,7 @@ def validate_session(session_id):
     if not row:
         return None
     if time.time() - row["last_active"] > SESSION_TIMEOUT_SECS:
-        logout_session(session_id, conn)
+        logout_session(session_id)
         return None
     return row["user_id"]
 

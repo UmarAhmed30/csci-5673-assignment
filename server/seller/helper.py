@@ -181,8 +181,8 @@ def update_units_for_sale(seller_id, item_id, quantity):
     conn = product_db.get_connection()
     cur = conn.cursor(dictionary=True)
     cur.execute(
-        "SELECT quantity FROM items WHERE category_id=%s AND item_id=%s AND seller_id=%s",
-        (category_id, item_id, seller_id),
+        "SELECT quantity FROM items WHERE item_id=%s AND seller_id=%s",
+        (item_id, seller_id),
     )
     row = cur.fetchone()
     if not row:
@@ -196,8 +196,8 @@ def update_units_for_sale(seller_id, item_id, quantity):
         return False, f"Cannot remove {quantity} units. Only {current_quantity} available"
     new_quantity = current_quantity - quantity
     cur.execute(
-        "UPDATE items SET quantity=%s WHERE category_id=%s AND item_id=%s AND seller_id=%s",
-        (new_quantity, category_id, item_id, seller_id),
+        "UPDATE items SET quantity=%s WHERE item_id=%s AND seller_id=%s",
+        (new_quantity, item_id, seller_id),
     )
     conn.commit()
     cur.close()

@@ -1,12 +1,9 @@
-import socket
 import sys
 from pathlib import Path
-import time
-import threading
+import requests
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from utils.helper import send_msg, recv_msg
 from server.seller.config import SELLER_SERVER_CONFIG
 
 SERVER_HOST = SELLER_SERVER_CONFIG["host"]
@@ -17,28 +14,69 @@ class SellerClient:
     def __init__(self, host=SERVER_HOST, port=SERVER_PORT):
         self.host = host
         self.port = port
-        self.sock = None
-        self.session_id = None
+        self.session = None
+        self.session_token = None
+        self.base_url = f"http://{host}:{port}"
 
     def connect(self):
-        self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.sock.connect((self.host, self.port))
+        self.session = requests.Session()
         print("[SELLER][CLIENT] Connected to seller server")
 
     def close(self):
-        if self.sock:
-            self.sock.close()
-            self.sock = None
+        if self.session:
+            self.session.close()
+            self.session = None
 
-    def send(self, op, args=None):
-        msg = {"op": op}
-        if args:
-            msg["args"] = args
-        if self.session_id:
-            msg["session_id"] = self.session_id
-        send_msg(self.sock, msg)
-        resp = recv_msg(self.sock)
-        return resp
+    def send(self, method, endpoint, json_data=None):
+        url = f"{self.base_url}{endpoint}"
+        headers = {}
+
+        # Include session token in Authorization header if authenticated
+        if self.session_token:
+            headers["Authorization"] = f"Bearer {self.session_token}"
+
+        try:
+            if method == "GET":
+                response = self.session.get(url, headers=headers, params=json_data)
+            elif method == "POST":
+                response = self.session.post(url, headers=headers, json=json_data)
+            elif method == "PUT":
+                response = self.session.put(url, headers=headers, json=json_data)
+            elif method == "DELETE":
+                response = self.session.delete(url, headers=headers, json=json_data)
+            else:
+                return {"status": "error", "message": f"Unsupported HTTP method: {method}"}
+
+            try:
+                data = response.json()
+            except:
+                data = {"message": response.text}
+
+            if response.status_code in [200, 201]:
+                return {"status": "ok", "data": data}
+            elif response.status_code == 400:
+                return {"status": "error", "message": data.get("detail", "Bad request")}
+            elif response.status_code == 401:
+                return {"status": "error", "message": data.get("detail", "Unauthorized")}
+            elif response.status_code == 403:
+                return {"status": "error", "message": data.get("detail", "Forbidden")}
+            elif response.status_code == 404:
+                return {"status": "error", "message": data.get("detail", "Not found")}
+            elif response.status_code == 409:
+                return {"status": "error", "message": data.get("detail", "Conflict")}
+            elif response.status_code == 422:
+                return {"status": "error", "message": data.get("detail", "Validation error")}
+            elif response.status_code >= 500:
+                return {"status": "error", "message": data.get("detail", "Server error")}
+            else:
+                return {"status": "error", "message": f"Unexpected status code: {response.status_code}"}
+
+        except requests.exceptions.ConnectionError:
+            return {"status": "error", "message": "Failed to connect to server"}
+        except requests.exceptions.Timeout:
+            return {"status": "error", "message": "Request timeout"}
+        except Exception as e:
+            return {"status": "error", "message": f"Request failed: {str(e)}"}
 
     def repl(self):
         print("\nSeller CLI")
@@ -85,40 +123,49 @@ class SellerClient:
         if len(parts) != 3:
             print("Usage: create_account <username> <password>")
             return
-        resp = self.send("create_account", {
+        resp = self.send("POST", "/api/sellers/register", {
             "username": parts[1],
             "password": parts[2],
         })
-        print(resp)
+        if resp["status"] == "ok":
+            print(f"[OK] {resp['data'].get('message', 'Account created')}")
+        else:
+            print(f"[ERROR] {resp.get('message', 'Unknown error')}")
 
     def login(self, parts):
         if len(parts) != 3:
             print("Usage: login <username> <password>")
             return
-        resp = self.send("login", {
+        resp = self.send("POST", "/api/sellers/login", {
             "username": parts[1],
             "password": parts[2],
         })
         if resp["status"] == "ok":
-            self.session_id = resp["data"]["session_id"]
+            self.session_token = resp["data"].get("token")
             print("[OK] Logged in")
         else:
-            print(resp)
+            print(f"[ERROR] {resp.get('message', 'Login failed')}")
 
     def logout(self):
-        resp = self.send("logout")
-        self.session_id = None
+        resp = self.send("POST", "/api/sellers/logout")
+        self.session_token = None
         if resp.get("status") == "ok":
             print("[OK] Successfully logged out")
         else:
-            print(resp)
+            print(f"[ERROR] {resp.get('message', 'Logout failed')}")
 
     def get_seller_rating(self, parts):
         if len(parts) != 1:
             print("Usage: get_seller_rating")
             return
-        resp = self.send("get_seller_rating")
-        print(resp)
+        resp = self.send("GET", "/api/sellers/rating")
+        if resp["status"] == "ok":
+            rating = resp["data"].get("rating", {})
+            print(f"[OK] Seller rating:")
+            for key, value in rating.items():
+                print(f"  {key}: {value}")
+        else:
+            print(f"[ERROR] {resp.get('message', 'Failed to get seller rating')}")
 
     def register_item_for_sale(self, parts):
         if len(parts) < 7:
@@ -130,23 +177,37 @@ class SellerClient:
         _, item_name, item_category, condition_type, sale_price, item_quantity = parts[:6]
         keywords = parts[6:]
 
-        resp = self.send("register_item_for_sale", {
-            "item_name": item_name,
-            "category": item_category,
-            "condition_type": condition_type,
+        resp = self.send("POST", "/api/sellers/items", {
+            "name": item_name,
+            "category": int(item_category),
+            "condition": condition_type,
             "price": float(sale_price),
             "quantity": int(item_quantity),
             "keywords": keywords
         })
 
-        print(resp)
+        if resp["status"] == "ok":
+            print(f"[OK] {resp['data'].get('message', 'Item registered successfully')}")
+            if "item_id" in resp["data"]:
+                print(f"  Item ID: {resp['data']['item_id']}")
+        else:
+            print(f"[ERROR] {resp.get('message', 'Failed to register item')}")
 
     def display_items_for_sale(self, parts):
         if len(parts) != 1:
             print("Usage: display_items_for_sale")
             return
-        resp = self.send("display_items_for_sale")
-        print(resp)
+        resp = self.send("GET", "/api/sellers/items")
+        if resp["status"] == "ok":
+            items = resp["data"].get("items", [])
+            if items:
+                print(f"[OK] You have {len(items)} items for sale:")
+                for item in items:
+                    print(f"  - Item ID: {item.get('item_id')}, Name: {item.get('name')}, Price: ${item.get('price')}, Quantity: {item.get('quantity')}")
+            else:
+                print("[OK] No items for sale")
+        else:
+            print(f"[ERROR] {resp.get('message', 'Failed to display items')}")
 
     def update_units_for_sale(self, parts):
         if len(parts) != 3:
@@ -163,11 +224,13 @@ class SellerClient:
             if quantity <= 0:
                 print("Error: Quantity to remove must be a positive integer")
                 return
-            resp = self.send("update_units_for_sale", {
-                "item_id": item_id,
-                "quantity": int(quantity)
+            resp = self.send("PUT", f"/api/sellers/items/{item_id}/quantity", {
+                "quantity": quantity
             })
-            print(resp)
+            if resp["status"] == "ok":
+                print(f"[OK] {resp['data'].get('message', 'Quantity updated successfully')}")
+            else:
+                print(f"[ERROR] {resp.get('message', 'Failed to update quantity')}")
         except ValueError:
             print("Error: item_id and quantity must be valid integers")
 
@@ -177,14 +240,27 @@ class SellerClient:
                 "Usage: change_item_price <item_id> <itemPrice> "
             )
             return
-        _, item_id, price = parts
+        try:
+            item_id = int(parts[1])
+            price = float(parts[2])
 
-        resp = self.send("change_item_price", {
-            "item_id": item_id,
-            "price": float(price)
-        })
+            if item_id <= 0:
+                print("Error: Item ID must be a positive integer")
+                return
+            if price <= 0:
+                print("Error: Price must be a positive number")
+                return
 
-        print(resp)
+            resp = self.send("PUT", f"/api/sellers/items/{item_id}/price", {
+                "price": price
+            })
+
+            if resp["status"] == "ok":
+                print(f"[OK] {resp['data'].get('message', 'Price updated successfully')}")
+            else:
+                print(f"[ERROR] {resp.get('message', 'Failed to update price')}")
+        except ValueError:
+            print("Error: item_id must be a valid integer and price must be a valid number")
 
     def print_help(self):
         print("""
