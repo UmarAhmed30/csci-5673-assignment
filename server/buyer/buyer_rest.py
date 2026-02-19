@@ -2,6 +2,9 @@ import sys
 from pathlib import Path
 import logging
 from typing import Optional
+import grpc
+import buyer_pb2
+import buyer_pb2_grpc
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
@@ -12,23 +15,6 @@ from typing import Literal
 import mysql.connector
 from zeep import Client as SoapClient
 
-from server.buyer.helper import (
-    create_buyer,
-    login_buyer,
-    logout_session,
-    validate_session,
-    touch_session,
-    search_items,
-    get_item,
-    add_to_cart,
-    remove_from_cart,
-    get_cart,
-    clear_cart,
-    save_cart,
-    provide_item_feedback,
-    get_seller_rating,
-    get_buyer_purchases,
-)
 from server.buyer.config import BUYER_SERVER_CONFIG
 
 logging.basicConfig(
@@ -36,6 +22,10 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+# gRPC channel and stub
+channel = grpc.insecure_channel("localhost:50052")
+stub = buyer_pb2_grpc.BuyerServiceStub(channel)
 
 app = FastAPI(
     title="Buyer Server APIs",
@@ -182,24 +172,21 @@ async def register_buyer(request: RegisterRequest):
         if not request.username or not request.password:
             logger.warning("Registration failed: Missing username or password")
             raise HTTPException(status_code=400, detail="Username and password are required")
-        result = create_buyer(request.username, request.password)
-        if isinstance(result, tuple):
-            buyer_id, msg = result
-            if not buyer_id:
-                if "Duplicate entry" in msg or "already exists" in msg.lower():
-                    logger.warning(f"Registration failed: Username {request.username} already exists")
-                    raise HTTPException(status_code=409, detail="Username already exists")
-                else:
-                    logger.warning(f"Registration failed: {msg}")
-                    raise HTTPException(status_code=400, detail=msg)
-            logger.info(f"Registration successful for username: {request.username}, buyer_id: {buyer_id}")
-            return AuthResponse(message="Account created successfully")
-        else:
-            logger.info(f"Registration successful for username: {request.username}")
-            return AuthResponse(message="Account created successfully")
-    except mysql.connector.IntegrityError as e:
-        logger.warning(f"Registration failed: Duplicate username {request.username} - {str(e)}")
-        raise HTTPException(status_code=409, detail="Username already exists")
+        response = stub.CreateBuyer(
+            buyer_pb2.CreateBuyerRequest(username=request.username, password=request.password)
+        )
+        if response.buyer_id == 0:
+            if "Duplicate entry" in response.message or "already exists" in response.message.lower():
+                logger.warning(f"Registration failed: Username {request.username} already exists")
+                raise HTTPException(status_code=409, detail="Username already exists")
+            else:
+                logger.warning(f"Registration failed: {response.message}")
+                raise HTTPException(status_code=400, detail=response.message)
+        logger.info(f"Registration successful for username: {request.username}, buyer_id: {response.buyer_id}")
+        return AuthResponse(message="Account created successfully")
+    except grpc.RpcError as e:
+        logger.error(f"gRPC error during registration: {e.details()}")
+        raise HTTPException(status_code=500, detail="Service unavailable")
     except HTTPException:
         raise
     except Exception as e:
@@ -214,12 +201,17 @@ async def login_buyer_endpoint(request: LoginRequest):
         if not request.username or not request.password:
             logger.warning("Login failed: Missing username or password")
             raise HTTPException(status_code=401, detail="Invalid credentials")
-        session_token = login_buyer(request.username, request.password)
-        if not session_token:
+        response = stub.LoginBuyer(
+            buyer_pb2.LoginBuyerRequest(username=request.username, password=request.password)
+        )
+        if not response.session_id:
             logger.warning(f"Login failed: Invalid credentials for username {request.username}")
             raise HTTPException(status_code=401, detail="Invalid credentials")
         logger.info(f"Login successful for username: {request.username}")
-        return AuthResponse(message="Login successful", token=session_token)
+        return AuthResponse(message="Login successful", token=response.session_id)
+    except grpc.RpcError as e:
+        logger.error(f"gRPC error during login: {e.details()}")
+        raise HTTPException(status_code=500, detail="Service unavailable")
     except HTTPException:
         raise
     except Exception as e:
@@ -237,13 +229,18 @@ async def get_current_buyer(authorization: Optional[str] = Header(None)) -> int:
         raise HTTPException(status_code=401, detail="Invalid authentication token format")
     token = parts[1]
     try:
-        buyer_id = validate_session(token)
-        if not buyer_id:
+        response = stub.ValidateSession(
+            buyer_pb2.ValidateSessionRequest(session_id=token)
+        )
+        if not response.user_id:
             logger.warning(f"Session validation failed: Invalid or expired token")
             raise HTTPException(status_code=401, detail="Invalid or expired session")
-        touch_session(token)
-        logger.debug(f"Session validated for buyer_id: {buyer_id}")
-        return buyer_id
+        stub.TouchSession(buyer_pb2.TouchSessionRequest(session_id=token))
+        logger.debug(f"Session validated for buyer_id: {response.user_id}")
+        return response.user_id
+    except grpc.RpcError as e:
+        logger.error(f"gRPC error during session validation: {e.details()}")
+        raise HTTPException(status_code=401, detail="Session validation failed")
     except HTTPException:
         raise
     except Exception as e:
@@ -262,9 +259,12 @@ async def logout_buyer_endpoint(
             logger.warning("Logout failed: Missing token")
             raise HTTPException(status_code=401, detail="Authentication required")
         logger.info(f"Logout request for buyer_id: {buyer_id}")
-        logout_session(token)
+        stub.LogoutBuyer(buyer_pb2.LogoutBuyerRequest(session_id=token))
         logger.info(f"Logout successful for buyer_id: {buyer_id}")
         return AuthResponse(message="Logout successful")
+    except grpc.RpcError as e:
+        logger.error(f"gRPC error during logout: {e.details()}")
+        raise HTTPException(status_code=500, detail="Service unavailable")
     except HTTPException:
         raise
     except Exception as e:
@@ -284,12 +284,30 @@ async def search_items_endpoint(category: Optional[str] = None, keywords: Option
             logger.warning("Item search failed: Missing category parameter")
             raise HTTPException(status_code=400, detail="Category parameter is required")
         logger.info(f"Item search request: category={category}, keywords={keywords}")
-        keywords_list = None
+        keywords_list = []
         if keywords:
             keywords_list = [kw.strip() for kw in keywords.split(",") if kw.strip()]
-        items = search_items(category, keywords_list)
+        response = stub.SearchItems(
+            buyer_pb2.SearchItemsRequest(category=int(category), keywords=keywords_list)
+        )
+        items = [
+            {
+                "item_id": item.item_id,
+                "item_name": item.item_name,
+                "category": item.category,
+                "condition_type": item.condition_type,
+                "price": item.price,
+                "quantity": item.quantity,
+                "thumbs_up": item.thumbs_up,
+                "thumbs_down": item.thumbs_down
+            }
+            for item in response.items
+        ]
         logger.info(f"Item search returned {len(items)} items")
         return {"items": items}
+    except grpc.RpcError as e:
+        logger.error(f"gRPC error during item search: {e.details()}")
+        raise HTTPException(status_code=500, detail="Service unavailable")
     except HTTPException:
         raise
     except Exception as e:
@@ -304,12 +322,25 @@ async def get_item_endpoint(item_id: int):
         if item_id <= 0:
             logger.warning(f"Item retrieval failed: Invalid item_id {item_id}")
             raise HTTPException(status_code=422, detail="Item ID must be a positive integer")
-        item = get_item(item_id)
-        if not item:
+        response = stub.GetItem(buyer_pb2.GetItemRequest(item_id=item_id))
+        if not response.success:
             logger.warning(f"Item retrieval failed: Item {item_id} not found")
             raise HTTPException(status_code=404, detail=f"Item with ID {item_id} not found")
+        item = {
+            "item_id": response.item.item_id,
+            "item_name": response.item.item_name,
+            "category": response.item.category,
+            "condition_type": response.item.condition_type,
+            "price": response.item.price,
+            "quantity": response.item.quantity,
+            "thumbs_up": response.item.thumbs_up,
+            "thumbs_down": response.item.thumbs_down
+        }
         logger.info(f"Item retrieval successful for item_id: {item_id}")
         return {"item": item}
+    except grpc.RpcError as e:
+        logger.error(f"gRPC error during item retrieval: {e.details()}")
+        raise HTTPException(status_code=500, detail="Service unavailable")
     except HTTPException:
         raise
     except ValueError:
@@ -327,16 +358,25 @@ async def add_to_cart_endpoint(
 ):
     try:
         logger.info(f"Add to cart request: buyer_id={buyer_id}, item_id={request.item_id}, quantity={request.quantity}")
-        success, message = add_to_cart(buyer_id, request.item_id, request.quantity)
-        if not success:
-            if "not found" in message.lower():
-                logger.warning(f"Add to cart failed: {message}")
-                raise HTTPException(status_code=404, detail=message)
+        response = stub.AddToCart(
+            buyer_pb2.AddToCartRequest(
+                buyer_id=buyer_id,
+                item_id=request.item_id,
+                quantity=request.quantity
+            )
+        )
+        if not response.success:
+            if "not found" in response.message.lower():
+                logger.warning(f"Add to cart failed: {response.message}")
+                raise HTTPException(status_code=404, detail=response.message)
             else:
-                logger.warning(f"Add to cart failed: {message}")
-                raise HTTPException(status_code=400, detail=message)
+                logger.warning(f"Add to cart failed: {response.message}")
+                raise HTTPException(status_code=400, detail=response.message)
         logger.info(f"Add to cart successful: buyer_id={buyer_id}, item_id={request.item_id}")
         return {"message": "Item added to cart"}
+    except grpc.RpcError as e:
+        logger.error(f"gRPC error during add to cart: {e.details()}")
+        raise HTTPException(status_code=500, detail="Service unavailable")
     except HTTPException:
         raise
     except Exception as e:
@@ -352,12 +392,21 @@ async def remove_from_cart_endpoint(
 ):
     try:
         logger.info(f"Remove from cart request: buyer_id={buyer_id}, item_id={item_id}, quantity={request.quantity}")
-        success, message = remove_from_cart(buyer_id, item_id, request.quantity)
-        if not success:
-            logger.warning(f"Remove from cart failed: {message}")
-            raise HTTPException(status_code=400, detail=message)
+        response = stub.RemoveFromCart(
+            buyer_pb2.RemoveFromCartRequest(
+                buyer_id=buyer_id,
+                item_id=item_id,
+                quantity=request.quantity
+            )
+        )
+        if not response.success:
+            logger.warning(f"Remove from cart failed: {response.message}")
+            raise HTTPException(status_code=400, detail=response.message)
         logger.info(f"Remove from cart successful: buyer_id={buyer_id}, item_id={item_id}")
         return {"message": "Item removed from cart"}
+    except grpc.RpcError as e:
+        logger.error(f"gRPC error during remove from cart: {e.details()}")
+        raise HTTPException(status_code=500, detail="Service unavailable")
     except HTTPException:
         raise
     except Exception as e:
@@ -369,9 +418,20 @@ async def remove_from_cart_endpoint(
 async def get_cart_endpoint(buyer_id: int = Depends(get_current_buyer)):
     try:
         logger.info(f"Get cart request: buyer_id={buyer_id}")
-        cart_items = get_cart(buyer_id)
+        response = stub.GetCart(buyer_pb2.GetCartRequest(buyer_id=buyer_id))
+        cart_items = [
+            {
+                "item_id": item.item_id,
+                "quantity": item.quantity,
+                "saved": item.saved
+            }
+            for item in response.items
+        ]
         logger.info(f"Get cart successful: buyer_id={buyer_id}, items={len(cart_items)}")
         return {"cart": cart_items}
+    except grpc.RpcError as e:
+        logger.error(f"gRPC error during get cart: {e.details()}")
+        raise HTTPException(status_code=500, detail="Service unavailable")
     except HTTPException:
         raise
     except Exception as e:
@@ -383,9 +443,12 @@ async def get_cart_endpoint(buyer_id: int = Depends(get_current_buyer)):
 async def clear_cart_endpoint(buyer_id: int = Depends(get_current_buyer)):
     try:
         logger.info(f"Clear cart request: buyer_id={buyer_id}")
-        clear_cart(buyer_id)
+        stub.ClearCart(buyer_pb2.ClearCartRequest(buyer_id=buyer_id))
         logger.info(f"Clear cart successful: buyer_id={buyer_id}")
         return {"message": "Cart cleared"}
+    except grpc.RpcError as e:
+        logger.error(f"gRPC error during clear cart: {e.details()}")
+        raise HTTPException(status_code=500, detail="Service unavailable")
     except HTTPException:
         raise
     except Exception as e:
@@ -397,16 +460,19 @@ async def clear_cart_endpoint(buyer_id: int = Depends(get_current_buyer)):
 async def save_cart_endpoint(buyer_id: int = Depends(get_current_buyer)):
     try:
         logger.info(f"Save cart request: buyer_id={buyer_id}")
-        cart_items = get_cart(buyer_id)
-        if not cart_items:
+        cart_response = stub.GetCart(buyer_pb2.GetCartRequest(buyer_id=buyer_id))
+        if not cart_response.items:
             logger.warning(f"Save cart failed: Empty cart for buyer_id={buyer_id}")
             raise HTTPException(status_code=400, detail="Cart is empty")
-        success, message = save_cart(buyer_id)
-        if not success:
-            logger.warning(f"Save cart failed: {message}")
-            raise HTTPException(status_code=400, detail=message)
-        logger.info(f"Save cart successful: buyer_id={buyer_id}, {message}")
+        response = stub.SaveCart(buyer_pb2.SaveCartRequest(buyer_id=buyer_id))
+        if not response.success:
+            logger.warning(f"Save cart failed: {response.message}")
+            raise HTTPException(status_code=400, detail=response.message)
+        logger.info(f"Save cart successful: buyer_id={buyer_id}, {response.message}")
         return {"message": "Cart saved successfully"}
+    except grpc.RpcError as e:
+        logger.error(f"gRPC error during save cart: {e.details()}")
+        raise HTTPException(status_code=500, detail="Service unavailable")
     except HTTPException:
         raise
     except Exception as e:
@@ -421,8 +487,8 @@ async def make_purchase(
 ):
     try:
         logger.info(f"Purchase request from buyer_id: {buyer_id}")
-        cart_items = get_cart(buyer_id)
-        if not cart_items:
+        cart_response = stub.GetCart(buyer_pb2.GetCartRequest(buyer_id=buyer_id))
+        if not cart_response.items:
             logger.warning(f"Purchase failed: Empty cart for buyer_id={buyer_id}")
             raise HTTPException(status_code=400, detail="Cart is empty")
         if not request.card_holder_name or not request.card_number or not request.expiration_date or not request.security_code:
@@ -443,36 +509,35 @@ async def make_purchase(
         except Exception as e:
             logger.error(f"Financial service error: {str(e)}", exc_info=True)
             raise HTTPException(status_code=503, detail="Financial service unavailable. Please try again later.")
-        success, message = save_cart(buyer_id)
-        if not success:
-            logger.warning(f"Purchase failed: {message}")
-            raise HTTPException(status_code=400, detail=message)
-        from db.client import ProductDBClient
-        product_db = ProductDBClient()
-        conn = product_db.get_connection()
-        cur = conn.cursor()
-        try:
-            for item in cart_items:
-                cur.execute(
-                    "INSERT INTO purchases (buyer_id, item_id) VALUES (%s, %s)",
-                    (buyer_id, item["item_id"])
-                )
-                # Decrease item quantity
-                cur.execute(
-                    "UPDATE items SET quantity = quantity - %s WHERE item_id = %s",
-                    (item["quantity"], item["item_id"])
-                )
-            conn.commit()
-            clear_cart(buyer_id)
-            logger.info(f"Purchase successful: buyer_id={buyer_id}, items={len(cart_items)}")
-            return {"message": "Purchase completed successfully", "items_purchased": len(cart_items)}
-        except Exception as e:
-            conn.rollback()
-            logger.error(f"Database error during purchase: {str(e)}", exc_info=True)
-            raise HTTPException(status_code=500, detail="Failed to record purchase")
-        finally:
-            cur.close()
-            conn.close()
+        
+        # Convert cart items to protobuf format
+        cart_items_pb = [
+            buyer_pb2.CartItem(
+                item_id=item.item_id,
+                quantity=item.quantity,
+                saved=item.saved
+            )
+            for item in cart_response.items
+        ]
+        
+        # Make purchase via gRPC (records purchases and decreases quantities)
+        purchase_response = stub.MakePurchase(
+            buyer_pb2.MakePurchaseRequest(
+                buyer_id=buyer_id,
+                cart_items=cart_items_pb
+            )
+        )
+        if not purchase_response.success:
+            logger.warning(f"Purchase failed: {purchase_response.message}")
+            raise HTTPException(status_code=500, detail=purchase_response.message)
+        
+        # Clear cart after successful purchase
+        stub.ClearCart(buyer_pb2.ClearCartRequest(buyer_id=buyer_id))
+        logger.info(f"Purchase successful: buyer_id={buyer_id}, items={purchase_response.items_purchased}")
+        return {"message": "Purchase completed successfully", "items_purchased": purchase_response.items_purchased}
+    except grpc.RpcError as e:
+        logger.error(f"gRPC error during purchase: {e.details()}")
+        raise HTTPException(status_code=500, detail="Service unavailable")
     except HTTPException:
         raise
     except Exception as e:
@@ -491,16 +556,24 @@ async def provide_feedback_endpoint(
         if item_id <= 0:
             logger.warning(f"Provide feedback failed: Invalid item_id {item_id}")
             raise HTTPException(status_code=422, detail="Item ID must be a positive integer")
-        success, message = provide_item_feedback(item_id, request.feedback)
-        if not success:
-            if "not found" in message.lower():
-                logger.warning(f"Provide feedback failed: {message}")
-                raise HTTPException(status_code=404, detail=message)
+        response = stub.ProvideItemFeedback(
+            buyer_pb2.ProvideItemFeedbackRequest(
+                item_id=item_id,
+                feedback=request.feedback
+            )
+        )
+        if not response.success:
+            if "not found" in response.message.lower():
+                logger.warning(f"Provide feedback failed: {response.message}")
+                raise HTTPException(status_code=404, detail=response.message)
             else:
-                logger.warning(f"Provide feedback failed: {message}")
-                raise HTTPException(status_code=422, detail=message)
+                logger.warning(f"Provide feedback failed: {response.message}")
+                raise HTTPException(status_code=422, detail=response.message)
         logger.info(f"Provide feedback successful: buyer_id={buyer_id}, item_id={item_id}")
         return {"message": "Feedback recorded"}
+    except grpc.RpcError as e:
+        logger.error(f"gRPC error during provide feedback: {e.details()}")
+        raise HTTPException(status_code=500, detail="Service unavailable")
     except HTTPException:
         raise
     except Exception as e:
@@ -515,12 +588,19 @@ async def get_seller_rating_endpoint(seller_id: int):
         if seller_id <= 0:
             logger.warning(f"Get seller rating failed: Invalid seller_id {seller_id}")
             raise HTTPException(status_code=404, detail=f"Seller with ID {seller_id} not found")
-        rating = get_seller_rating(seller_id)
-        if not rating:
+        response = stub.GetSellerRating(buyer_pb2.GetSellerRatingRequest(seller_id=seller_id))
+        if not response.success:
             logger.warning(f"Get seller rating failed: Seller {seller_id} not found")
             raise HTTPException(status_code=404, detail=f"Seller with ID {seller_id} not found")
+        rating = {
+            "thumbs_up": response.thumbs_up,
+            "thumbs_down": response.thumbs_down
+        }
         logger.info(f"Get seller rating successful for seller_id: {seller_id}")
         return {"rating": rating}
+    except grpc.RpcError as e:
+        logger.error(f"gRPC error during get seller rating: {e.details()}")
+        raise HTTPException(status_code=500, detail="Service unavailable")
     except HTTPException:
         raise
     except Exception as e:
@@ -532,9 +612,19 @@ async def get_seller_rating_endpoint(seller_id: int):
 async def get_purchases_endpoint(buyer_id: int = Depends(get_current_buyer)):
     try:
         logger.info(f"Get purchases request: buyer_id={buyer_id}")
-        purchases = get_buyer_purchases(buyer_id)
+        response = stub.GetBuyerPurchases(buyer_pb2.GetBuyerPurchasesRequest(buyer_id=buyer_id))
+        purchases = [
+            {
+                "item_id": purchase.item_id,
+                "timestamp": purchase.timestamp
+            }
+            for purchase in response.purchases
+        ]
         logger.info(f"Get purchases successful: buyer_id={buyer_id}, purchases={len(purchases)}")
         return {"purchases": purchases}
+    except grpc.RpcError as e:
+        logger.error(f"gRPC error during get purchases: {e.details()}")
+        raise HTTPException(status_code=500, detail="Service unavailable")
     except HTTPException:
         raise
     except Exception as e:

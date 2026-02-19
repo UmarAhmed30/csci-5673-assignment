@@ -1,0 +1,120 @@
+syntax = "proto3";
+
+package seller;
+
+service SellerService {
+  rpc CreateSeller       (CreateSellerRequest)      returns (CreateSellerResponse);
+  rpc LoginSeller        (LoginSellerRequest)        returns (LoginSellerResponse);
+  rpc LogoutSeller       (LogoutSellerRequest)       returns (LogoutSellerResponse);
+  rpc ValidateSession    (ValidateSessionRequest)    returns (ValidateSessionResponse);
+  rpc TouchSession       (TouchSessionRequest)       returns (TouchSessionResponse);
+  rpc GetSellerRating    (GetSellerRatingRequest)    returns (GetSellerRatingResponse);
+  rpc RegisterItem       (RegisterItemRequest)       returns (RegisterItemResponse);
+  rpc DisplayItems       (DisplayItemsRequest)       returns (DisplayItemsResponse);
+  rpc UpdateUnitsForSale (UpdateUnitsForSaleRequest) returns (UpdateUnitsForSaleResponse);
+  rpc ChangeItemPrice    (ChangeItemPriceRequest)    returns (ChangeItemPriceResponse);
+}
+
+// CreateSeller
+message CreateSellerRequest {
+  string username = 1;
+  string password = 2;
+}
+message CreateSellerResponse {
+  int32  seller_id = 1;
+  string message   = 2;
+}
+
+// LoginSeller
+message LoginSellerRequest {
+  string username = 1;
+  string password = 2;
+}
+message LoginSellerResponse {
+  string session_id = 1; // empty string if failed
+}
+
+// LogoutSeller
+message LogoutSellerRequest {
+  string session_id = 1;
+}
+message LogoutSellerResponse {}
+
+// ValidateSession
+message ValidateSessionRequest {
+  string session_id = 1;
+}
+message ValidateSessionResponse {
+  int32 user_id = 1; // 0 if invalid
+}
+
+// TouchSession
+message TouchSessionRequest {
+  string session_id = 1;
+}
+message TouchSessionResponse {}
+
+// GetSellerRating
+message GetSellerRatingRequest {
+  int32 seller_id = 1;
+}
+message GetSellerRatingResponse {
+  int32 thumbs_up   = 1;
+  int32 thumbs_down = 2;
+}
+
+// RegisterItem
+message RegisterItemRequest {
+  int32   seller_id      = 1;
+  string  item_name      = 2;
+  int32   item_category  = 3;
+  string  condition_type = 4;
+  double  sale_price     = 5;
+  int32   quantity       = 6;
+  repeated string keywords = 7;
+}
+message RegisterItemResponse {
+  bool   success = 1;
+  int32  item_id = 2;
+  string message = 3;
+}
+
+// DisplayItems
+message DisplayItemsRequest {
+  int32 seller_id = 1;
+}
+message Item {
+  int32  item_id        = 1;
+  string item_name      = 2;
+  int32  category       = 3;
+  string condition_type = 4;
+  double price          = 5;
+  int32  quantity       = 6;
+  int32  thumbs_up      = 7;
+  int32  thumbs_down    = 8;
+}
+message DisplayItemsResponse {
+  repeated Item items = 1;
+}
+
+// UpdateUnitsForSale
+message UpdateUnitsForSaleRequest {
+  int32 seller_id = 1;
+  int32 item_id   = 2;
+  int32 quantity  = 3;
+}
+message UpdateUnitsForSaleResponse {
+  bool   success = 1;
+  string message = 2;
+}
+
+// ChangeItemPrice
+message ChangeItemPriceRequest {
+  int32  seller_id = 1;
+  int32  item_id   = 2;
+  double price     = 3;
+}
+message ChangeItemPriceResponse {
+  bool   success = 1;
+  string message = 2;
+}

@@ -2,6 +2,9 @@ import sys
 from pathlib import Path
 import logging
 from typing import Optional
+import grpc
+import seller_pb2
+import seller_pb2_grpc
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
@@ -10,28 +13,17 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import mysql.connector
 
-from server.seller.helper import (
-    create_seller,
-    login_seller,
-    logout_seller,
-    validate_session,
-    touch_session,
-    get_seller_rating,
-    register_item_for_sale,
-    display_items_for_sale,
-    update_units_for_sale,
-    change_item_price,
-)
 from server.seller.config import SELLER_SERVER_CONFIG
-from db.client import ProductDBClient
-
-product_db = ProductDBClient()
 
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+# gRPC channel and stub
+channel = grpc.insecure_channel("localhost:50051")
+stub = seller_pb2_grpc.SellerServiceStub(channel)
 
 app = FastAPI(
     title="Seller Server APIs",
@@ -170,26 +162,21 @@ async def register_seller(request: RegisterRequest):
     try:
         logger.info(f"Registration attempt for username: {request.username}")
         if not request.username or not request.password:
-            logger.warning("Registration failed: Missing username or password")
             raise HTTPException(status_code=400, detail="Username and password are required")
-        result = create_seller(request.username, request.password)
-        if isinstance(result, tuple):
-            seller_id, msg = result
-            if not seller_id:
-                if "Duplicate entry" in msg or "already exists" in msg.lower():
-                    logger.warning(f"Registration failed: Username {request.username} already exists")
-                    raise HTTPException(status_code=409, detail="Username already exists")
-                else:
-                    logger.warning(f"Registration failed: {msg}")
-                    raise HTTPException(status_code=400, detail=msg)
-            logger.info(f"Registration successful for username: {request.username}, seller_id: {seller_id}")
-            return AuthResponse(message="Account created successfully")
-        else:
-            logger.info(f"Registration successful for username: {request.username}")
-            return AuthResponse(message="Account created successfully")
-    except mysql.connector.IntegrityError as e:
-        logger.warning(f"Registration failed: Duplicate username {request.username} - {str(e)}")
-        raise HTTPException(status_code=409, detail="Username already exists")
+
+        response = stub.CreateSeller(
+            seller_pb2.CreateSellerRequest(username=request.username, password=request.password)
+        )
+        if response.message != "OK":
+            if "Duplicate entry" in response.message or "already exists" in response.message.lower():
+                raise HTTPException(status_code=409, detail="Username already exists")
+            raise HTTPException(status_code=400, detail=response.message)
+
+        logger.info(f"Registration successful for username: {request.username}")
+        return AuthResponse(message="Account created successfully")
+    except grpc.RpcError as e:
+        logger.error(f"gRPC error during registration: {e.details()}")
+        raise HTTPException(status_code=500, detail="Service unavailable")
     except HTTPException:
         raise
     except Exception as e:
@@ -201,16 +188,20 @@ async def register_seller(request: RegisterRequest):
 async def login_seller_endpoint(request: LoginRequest):
     try:
         logger.info(f"Login attempt for username: {request.username}")
-
         if not request.username or not request.password:
-            logger.warning("Login failed: Missing username or password")
             raise HTTPException(status_code=401, detail="Invalid credentials")
-        session_token = login_seller(request.username, request.password)
-        if not session_token:
-            logger.warning(f"Login failed: Invalid credentials for username {request.username}")
+
+        response = stub.LoginSeller(
+            seller_pb2.LoginSellerRequest(username=request.username, password=request.password)
+        )
+        if not response.session_id:
             raise HTTPException(status_code=401, detail="Invalid credentials")
+
         logger.info(f"Login successful for username: {request.username}")
-        return AuthResponse(message="Login successful", token=session_token)
+        return AuthResponse(message="Login successful", token=response.session_id)
+    except grpc.RpcError as e:
+        logger.error(f"gRPC error during login: {e.details()}")
+        raise HTTPException(status_code=500, detail="Service unavailable")
     except HTTPException:
         raise
     except Exception as e:
@@ -220,21 +211,23 @@ async def login_seller_endpoint(request: LoginRequest):
 
 async def get_current_seller(authorization: Optional[str] = Header(None)) -> int:
     if not authorization:
-        logger.warning("Session validation failed: Missing Authorization header")
         raise HTTPException(status_code=401, detail="Authentication required")
     parts = authorization.split()
     if len(parts) != 2 or parts[0].lower() != "bearer":
-        logger.warning("Session validation failed: Invalid Authorization header format")
         raise HTTPException(status_code=401, detail="Invalid authentication token format")
     token = parts[1]
     try:
-        seller_id = validate_session(token)
-        if not seller_id:
-            logger.warning(f"Session validation failed: Invalid or expired token")
+        response = stub.ValidateSession(
+            seller_pb2.ValidateSessionRequest(session_id=token)
+        )
+        if not response.user_id:
             raise HTTPException(status_code=401, detail="Invalid or expired session")
-        touch_session(token)
-        logger.debug(f"Session validated for seller_id: {seller_id}")
-        return seller_id
+
+        stub.TouchSession(seller_pb2.TouchSessionRequest(session_id=token))
+        return response.user_id
+    except grpc.RpcError as e:
+        logger.error(f"gRPC error during session validation: {e.details()}")
+        raise HTTPException(status_code=401, detail="Session validation failed")
     except HTTPException:
         raise
     except Exception as e:
@@ -250,12 +243,14 @@ async def logout_seller_endpoint(
     try:
         token = authorization.split()[1] if authorization else None
         if not token:
-            logger.warning("Logout failed: Missing token")
             raise HTTPException(status_code=401, detail="Authentication required")
-        logger.info(f"Logout request for seller_id: {seller_id}")
-        logout_seller(token)
+
+        stub.LogoutSeller(seller_pb2.LogoutSellerRequest(session_id=token))
         logger.info(f"Logout successful for seller_id: {seller_id}")
         return AuthResponse(message="Logout successful")
+    except grpc.RpcError as e:
+        logger.error(f"gRPC error during logout: {e.details()}")
+        raise HTTPException(status_code=500, detail="Service unavailable")
     except HTTPException:
         raise
     except Exception as e:
@@ -270,20 +265,25 @@ async def register_item(
 ):
     try:
         logger.info(f"Item registration attempt by seller_id: {seller_id}")
-        success, result = register_item_for_sale(
-            seller_id=seller_id,
-            item_name=request.name,
-            item_category=request.category,
-            condition_type=request.condition,
-            salePrice=request.price,
-            quantity=request.quantity,
-            keywords=request.keywords
+        response = stub.RegisterItem(
+            seller_pb2.RegisterItemRequest(
+                seller_id=seller_id,
+                item_name=request.name,
+                item_category=request.category,
+                condition_type=request.condition,
+                sale_price=request.price,
+                quantity=request.quantity,
+                keywords=request.keywords
+            )
         )
-        if not success:
-            logger.warning(f"Item registration failed: {result}")
-            raise HTTPException(status_code=422, detail=result)
-        logger.info(f"Item registered successfully: {result}")
-        return {"message": "Item registered successfully", "item_id": result["item_id"]}
+        if not response.success:
+            raise HTTPException(status_code=422, detail=response.message)
+
+        logger.info(f"Item registered successfully, item_id: {response.item_id}")
+        return {"message": "Item registered successfully", "item_id": response.item_id}
+    except grpc.RpcError as e:
+        logger.error(f"gRPC error during item registration: {e.details()}")
+        raise HTTPException(status_code=500, detail="Service unavailable")
     except HTTPException:
         raise
     except Exception as e:
@@ -295,9 +295,27 @@ async def register_item(
 async def get_seller_items(seller_id: int = Depends(get_current_seller)):
     try:
         logger.info(f"Fetching items for seller_id: {seller_id}")
-        items = display_items_for_sale(seller_id)
+        response = stub.DisplayItems(
+            seller_pb2.DisplayItemsRequest(seller_id=seller_id)
+        )
+        items = [
+            {
+                "item_id": item.item_id,
+                "item_name": item.item_name,
+                "category": item.category,
+                "condition_type": item.condition_type,
+                "price": item.price,
+                "quantity": item.quantity,
+                "thumbs_up": item.thumbs_up,
+                "thumbs_down": item.thumbs_down
+            }
+            for item in response.items
+        ]
         logger.info(f"Retrieved {len(items)} items for seller_id: {seller_id}")
         return {"items": items}
+    except grpc.RpcError as e:
+        logger.error(f"gRPC error fetching items: {e.details()}")
+        raise HTTPException(status_code=500, detail="Service unavailable")
     except HTTPException:
         raise
     except Exception as e:
@@ -313,27 +331,21 @@ async def update_item_quantity(
 ):
     try:
         logger.info(f"Quantity update attempt for item_id: {item_id} by seller_id: {seller_id}")
-        conn = product_db.get_connection()
-        cur = conn.cursor(dictionary=True)
-        cur.execute(
-            "SELECT seller_id FROM items WHERE item_id=%s",
-            (item_id,)
+        response = stub.UpdateUnitsForSale(
+            seller_pb2.UpdateUnitsForSaleRequest(
+                seller_id=seller_id,
+                item_id=item_id,
+                quantity=request.quantity
+            )
         )
-        row = cur.fetchone()
-        cur.close()
-        conn.close()
-        if not row:
-            logger.warning(f"Item not found: {item_id}")
-            raise HTTPException(status_code=404, detail="Item not found")
-        if row["seller_id"] != seller_id:
-            logger.warning(f"Seller {seller_id} does not own item {item_id}")
-            raise HTTPException(status_code=403, detail="You do not own this item")
-        success, message = update_units_for_sale(seller_id, item_id, request.quantity)
-        if not success:
-            logger.warning(f"Quantity update failed: {message}")
-            raise HTTPException(status_code=400, detail=message)
+        if not response.success:
+            raise HTTPException(status_code=400, detail=response.message)
+
         logger.info(f"Quantity updated successfully for item_id: {item_id}")
-        return {"message": message}
+        return {"message": response.message}
+    except grpc.RpcError as e:
+        logger.error(f"gRPC error updating quantity: {e.details()}")
+        raise HTTPException(status_code=500, detail="Service unavailable")
     except HTTPException:
         raise
     except Exception as e:
@@ -350,29 +362,23 @@ async def update_item_price(
     try:
         logger.info(f"Price update attempt for item_id: {item_id} by seller_id: {seller_id}")
         if request.price <= 0:
-            logger.warning(f"Invalid price: {request.price}")
             raise HTTPException(status_code=422, detail="Price must be a positive number")
-        conn = product_db.get_connection()
-        cur = conn.cursor(dictionary=True)
-        cur.execute(
-            "SELECT seller_id FROM items WHERE item_id=%s",
-            (item_id,)
+
+        response = stub.ChangeItemPrice(
+            seller_pb2.ChangeItemPriceRequest(
+                seller_id=seller_id,
+                item_id=item_id,
+                price=request.price
+            )
         )
-        row = cur.fetchone()
-        cur.close()
-        conn.close()
-        if not row:
-            logger.warning(f"Item not found: {item_id}")
-            raise HTTPException(status_code=404, detail="Item not found")
-        if row["seller_id"] != seller_id:
-            logger.warning(f"Seller {seller_id} does not own item {item_id}")
-            raise HTTPException(status_code=403, detail="You do not own this item")
-        success, message = change_item_price(seller_id, item_id, request.price)
-        if not success:
-            logger.warning(f"Price update failed: {message}")
-            raise HTTPException(status_code=400, detail=message)
+        if not response.success:
+            raise HTTPException(status_code=400, detail=response.message)
+
         logger.info(f"Price updated successfully for item_id: {item_id}")
         return {"message": "Price updated successfully"}
+    except grpc.RpcError as e:
+        logger.error(f"gRPC error updating price: {e.details()}")
+        raise HTTPException(status_code=500, detail="Service unavailable")
     except HTTPException:
         raise
     except Exception as e:
@@ -384,12 +390,14 @@ async def update_item_price(
 async def get_own_rating(seller_id: int = Depends(get_current_seller)):
     try:
         logger.info(f"Rating retrieval for seller_id: {seller_id}")
-        rating = get_seller_rating(seller_id)
-        if not rating:
-            logger.warning(f"Rating not found for seller_id: {seller_id}")
-            raise HTTPException(status_code=404, detail="Rating not found")
+        response = stub.GetSellerRating(
+            seller_pb2.GetSellerRatingRequest(seller_id=seller_id)
+        )
         logger.info(f"Rating retrieved for seller_id: {seller_id}")
-        return {"rating": rating}
+        return {"rating": {"thumbs_up": response.thumbs_up, "thumbs_down": response.thumbs_down}}
+    except grpc.RpcError as e:
+        logger.error(f"gRPC error retrieving rating: {e.details()}")
+        raise HTTPException(status_code=500, detail="Service unavailable")
     except HTTPException:
         raise
     except Exception as e:
