@@ -24,7 +24,7 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0cseller.proto\x12\x06seller\"9\n\x13\x43reateSellerRequest\x12\x10\n\x08username\x18\x01 \x01(\t\x12\x10\n\x08password\x18\x02 \x01(\t\":\n\x14\x43reateSellerResponse\x12\x11\n\tseller_id\x18\x01 \x01(\x05\x12\x0f\n\x07message\x18\x02 \x01(\t2Z\n\rSellerService\x12I\n\x0c\x43reateSeller\x12\x1b.seller.CreateSellerRequest\x1a\x1c.seller.CreateSellerResponseb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0cseller.proto\x12\x06seller\"9\n\x13\x43reateSellerRequest\x12\x10\n\x08username\x18\x01 \x01(\t\x12\x10\n\x08password\x18\x02 \x01(\t\":\n\x14\x43reateSellerResponse\x12\x11\n\tseller_id\x18\x01 \x01(\x05\x12\x0f\n\x07message\x18\x02 \x01(\t\"8\n\x12LoginSellerRequest\x12\x10\n\x08username\x18\x01 \x01(\t\x12\x10\n\x08password\x18\x02 \x01(\t\")\n\x13LoginSellerResponse\x12\x12\n\nsession_id\x18\x01 \x01(\t\")\n\x13LogoutSellerRequest\x12\x12\n\nsession_id\x18\x01 \x01(\t\"\x16\n\x14LogoutSellerResponse\",\n\x16ValidateSessionRequest\x12\x12\n\nsession_id\x18\x01 \x01(\t\"*\n\x17ValidateSessionResponse\x12\x0f\n\x07user_id\x18\x01 \x01(\x05\")\n\x13TouchSessionRequest\x12\x12\n\nsession_id\x18\x01 \x01(\t\"\x16\n\x14TouchSessionResponse\"+\n\x16GetSellerRatingRequest\x12\x11\n\tseller_id\x18\x01 \x01(\x05\"A\n\x17GetSellerRatingResponse\x12\x11\n\tthumbs_up\x18\x01 \x01(\x05\x12\x13\n\x0bthumbs_down\x18\x02 \x01(\x05\"\xa2\x01\n\x13RegisterItemRequest\x12\x11\n\tseller_id\x18\x01 \x01(\x05\x12\x11\n\titem_name\x18\x02 \x01(\t\x12\x15\n\ritem_category\x18\x03 \x01(\x05\x12\x16\n\x0e\x63ondition_type\x18\x04 \x01(\t\x12\x12\n\nsale_price\x18\x05 \x01(\x01\x12\x10\n\x08quantity\x18\x06 \x01(\x05\x12\x10\n\x08keywords\x18\x07 \x03(\t\"I\n\x14RegisterItemResponse\x12\x0f\n\x07success\x18\x01 \x01(\x08\x12\x0f\n\x07item_id\x18\x02 \x01(\x05\x12\x0f\n\x07message\x18\x03 \x01(\t\"(\n\x13\x44isplayItemsRequest\x12\x11\n\tseller_id\x18\x01 \x01(\x05\"\x9d\x01\n\x04Item\x12\x0f\n\x07item_id\x18\x01 \x01(\x05\x12\x11\n\titem_name\x18\x02 \x01(\t\x12\x10\n\x08\x63\x61tegory\x18\x03 \x01(\x05\x12\x16\n\x0e\x63ondition_type\x18\x04 \x01(\t\x12\r\n\x05price\x18\x05 \x01(\x01\x12\x10\n\x08quantity\x18\x06 \x01(\x05\x12\x11\n\tthumbs_up\x18\x07 \x01(\x05\x12\x13\n\x0bthumbs_down\x18\x08 \x01(\x05\"3\n\x14\x44isplayItemsResponse\x12\x1b\n\x05items\x18\x01 \x03(\x0b\x32\x0c.seller.Item\"Q\n\x19UpdateUnitsForSaleRequest\x12\x11\n\tseller_id\x18\x01 \x01(\x05\x12\x0f\n\x07item_id\x18\x02 \x01(\x05\x12\x10\n\x08quantity\x18\x03 \x01(\x05\">\n\x1aUpdateUnitsForSaleResponse\x12\x0f\n\x07success\x18\x01 \x01(\x08\x12\x0f\n\x07message\x18\x02 \x01(\t\"K\n\x16\x43hangeItemPriceRequest\x12\x11\n\tseller_id\x18\x01 \x01(\x05\x12\x0f\n\x07item_id\x18\x02 \x01(\x05\x12\r\n\x05price\x18\x03 \x01(\x01\";\n\x17\x43hangeItemPriceResponse\x12\x0f\n\x07success\x18\x01 \x01(\x08\x12\x0f\n\x07message\x18\x02 \x01(\t2\xa7\x06\n\rSellerService\x12I\n\x0c\x43reateSeller\x12\x1b.seller.CreateSellerRequest\x1a\x1c.seller.CreateSellerResponse\x12\x46\n\x0bLoginSeller\x12\x1a.seller.LoginSellerRequest\x1a\x1b.seller.LoginSellerResponse\x12I\n\x0cLogoutSeller\x12\x1b.seller.LogoutSellerRequest\x1a\x1c.seller.LogoutSellerResponse\x12R\n\x0fValidateSession\x12\x1e.seller.ValidateSessionRequest\x1a\x1f.seller.ValidateSessionResponse\x12I\n\x0cTouchSession\x12\x1b.seller.TouchSessionRequest\x1a\x1c.seller.TouchSessionResponse\x12R\n\x0fGetSellerRating\x12\x1e.seller.GetSellerRatingRequest\x1a\x1f.seller.GetSellerRatingResponse\x12I\n\x0cRegisterItem\x12\x1b.seller.RegisterItemRequest\x1a\x1c.seller.RegisterItemResponse\x12I\n\x0c\x44isplayItems\x12\x1b.seller.DisplayItemsRequest\x1a\x1c.seller.DisplayItemsResponse\x12[\n\x12UpdateUnitsForSale\x12!.seller.UpdateUnitsForSaleRequest\x1a\".seller.UpdateUnitsForSaleResponse\x12R\n\x0f\x43hangeItemPrice\x12\x1e.seller.ChangeItemPriceRequest\x1a\x1f.seller.ChangeItemPriceResponseb\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -35,6 +35,44 @@ if not _descriptor._USE_C_DESCRIPTORS:
   _globals['_CREATESELLERREQUEST']._serialized_end=81
   _globals['_CREATESELLERRESPONSE']._serialized_start=83
   _globals['_CREATESELLERRESPONSE']._serialized_end=141
-  _globals['_SELLERSERVICE']._serialized_start=143
-  _globals['_SELLERSERVICE']._serialized_end=233
+  _globals['_LOGINSELLERREQUEST']._serialized_start=143
+  _globals['_LOGINSELLERREQUEST']._serialized_end=199
+  _globals['_LOGINSELLERRESPONSE']._serialized_start=201
+  _globals['_LOGINSELLERRESPONSE']._serialized_end=242
+  _globals['_LOGOUTSELLERREQUEST']._serialized_start=244
+  _globals['_LOGOUTSELLERREQUEST']._serialized_end=285
+  _globals['_LOGOUTSELLERRESPONSE']._serialized_start=287
+  _globals['_LOGOUTSELLERRESPONSE']._serialized_end=309
+  _globals['_VALIDATESESSIONREQUEST']._serialized_start=311
+  _globals['_VALIDATESESSIONREQUEST']._serialized_end=355
+  _globals['_VALIDATESESSIONRESPONSE']._serialized_start=357
+  _globals['_VALIDATESESSIONRESPONSE']._serialized_end=399
+  _globals['_TOUCHSESSIONREQUEST']._serialized_start=401
+  _globals['_TOUCHSESSIONREQUEST']._serialized_end=442
+  _globals['_TOUCHSESSIONRESPONSE']._serialized_start=444
+  _globals['_TOUCHSESSIONRESPONSE']._serialized_end=466
+  _globals['_GETSELLERRATINGREQUEST']._serialized_start=468
+  _globals['_GETSELLERRATINGREQUEST']._serialized_end=511
+  _globals['_GETSELLERRATINGRESPONSE']._serialized_start=513
+  _globals['_GETSELLERRATINGRESPONSE']._serialized_end=578
+  _globals['_REGISTERITEMREQUEST']._serialized_start=581
+  _globals['_REGISTERITEMREQUEST']._serialized_end=743
+  _globals['_REGISTERITEMRESPONSE']._serialized_start=745
+  _globals['_REGISTERITEMRESPONSE']._serialized_end=818
+  _globals['_DISPLAYITEMSREQUEST']._serialized_start=820
+  _globals['_DISPLAYITEMSREQUEST']._serialized_end=860
+  _globals['_ITEM']._serialized_start=863
+  _globals['_ITEM']._serialized_end=1020
+  _globals['_DISPLAYITEMSRESPONSE']._serialized_start=1022
+  _globals['_DISPLAYITEMSRESPONSE']._serialized_end=1073
+  _globals['_UPDATEUNITSFORSALEREQUEST']._serialized_start=1075
+  _globals['_UPDATEUNITSFORSALEREQUEST']._serialized_end=1156
+  _globals['_UPDATEUNITSFORSALERESPONSE']._serialized_start=1158
+  _globals['_UPDATEUNITSFORSALERESPONSE']._serialized_end=1220
+  _globals['_CHANGEITEMPRICEREQUEST']._serialized_start=1222
+  _globals['_CHANGEITEMPRICEREQUEST']._serialized_end=1297
+  _globals['_CHANGEITEMPRICERESPONSE']._serialized_start=1299
+  _globals['_CHANGEITEMPRICERESPONSE']._serialized_end=1358
+  _globals['_SELLERSERVICE']._serialized_start=1361
+  _globals['_SELLERSERVICE']._serialized_end=2168
 # @@protoc_insertion_point(module_scope)

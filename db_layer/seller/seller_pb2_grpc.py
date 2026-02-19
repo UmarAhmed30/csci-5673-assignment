@@ -39,12 +39,111 @@ class SellerServiceStub(object):
                 request_serializer=seller__pb2.CreateSellerRequest.SerializeToString,
                 response_deserializer=seller__pb2.CreateSellerResponse.FromString,
                 _registered_method=True)
+        self.LoginSeller = channel.unary_unary(
+                '/seller.SellerService/LoginSeller',
+                request_serializer=seller__pb2.LoginSellerRequest.SerializeToString,
+                response_deserializer=seller__pb2.LoginSellerResponse.FromString,
+                _registered_method=True)
+        self.LogoutSeller = channel.unary_unary(
+                '/seller.SellerService/LogoutSeller',
+                request_serializer=seller__pb2.LogoutSellerRequest.SerializeToString,
+                response_deserializer=seller__pb2.LogoutSellerResponse.FromString,
+                _registered_method=True)
+        self.ValidateSession = channel.unary_unary(
+                '/seller.SellerService/ValidateSession',
+                request_serializer=seller__pb2.ValidateSessionRequest.SerializeToString,
+                response_deserializer=seller__pb2.ValidateSessionResponse.FromString,
+                _registered_method=True)
+        self.TouchSession = channel.unary_unary(
+                '/seller.SellerService/TouchSession',
+                request_serializer=seller__pb2.TouchSessionRequest.SerializeToString,
+                response_deserializer=seller__pb2.TouchSessionResponse.FromString,
+                _registered_method=True)
+        self.GetSellerRating = channel.unary_unary(
+                '/seller.SellerService/GetSellerRating',
+                request_serializer=seller__pb2.GetSellerRatingRequest.SerializeToString,
+                response_deserializer=seller__pb2.GetSellerRatingResponse.FromString,
+                _registered_method=True)
+        self.RegisterItem = channel.unary_unary(
+                '/seller.SellerService/RegisterItem',
+                request_serializer=seller__pb2.RegisterItemRequest.SerializeToString,
+                response_deserializer=seller__pb2.RegisterItemResponse.FromString,
+                _registered_method=True)
+        self.DisplayItems = channel.unary_unary(
+                '/seller.SellerService/DisplayItems',
+                request_serializer=seller__pb2.DisplayItemsRequest.SerializeToString,
+                response_deserializer=seller__pb2.DisplayItemsResponse.FromString,
+                _registered_method=True)
+        self.UpdateUnitsForSale = channel.unary_unary(
+                '/seller.SellerService/UpdateUnitsForSale',
+                request_serializer=seller__pb2.UpdateUnitsForSaleRequest.SerializeToString,
+                response_deserializer=seller__pb2.UpdateUnitsForSaleResponse.FromString,
+                _registered_method=True)
+        self.ChangeItemPrice = channel.unary_unary(
+                '/seller.SellerService/ChangeItemPrice',
+                request_serializer=seller__pb2.ChangeItemPriceRequest.SerializeToString,
+                response_deserializer=seller__pb2.ChangeItemPriceResponse.FromString,
+                _registered_method=True)
 
 
 class SellerServiceServicer(object):
     """Missing associated documentation comment in .proto file."""
 
     def CreateSeller(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def LoginSeller(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def LogoutSeller(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def ValidateSession(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def TouchSession(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetSellerRating(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def RegisterItem(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def DisplayItems(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def UpdateUnitsForSale(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def ChangeItemPrice(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -57,6 +156,51 @@ def add_SellerServiceServicer_to_server(servicer, server):
                     servicer.CreateSeller,
                     request_deserializer=seller__pb2.CreateSellerRequest.FromString,
                     response_serializer=seller__pb2.CreateSellerResponse.SerializeToString,
+            ),
+            'LoginSeller': grpc.unary_unary_rpc_method_handler(
+                    servicer.LoginSeller,
+                    request_deserializer=seller__pb2.LoginSellerRequest.FromString,
+                    response_serializer=seller__pb2.LoginSellerResponse.SerializeToString,
+            ),
+            'LogoutSeller': grpc.unary_unary_rpc_method_handler(
+                    servicer.LogoutSeller,
+                    request_deserializer=seller__pb2.LogoutSellerRequest.FromString,
+                    response_serializer=seller__pb2.LogoutSellerResponse.SerializeToString,
+            ),
+            'ValidateSession': grpc.unary_unary_rpc_method_handler(
+                    servicer.ValidateSession,
+                    request_deserializer=seller__pb2.ValidateSessionRequest.FromString,
+                    response_serializer=seller__pb2.ValidateSessionResponse.SerializeToString,
+            ),
+            'TouchSession': grpc.unary_unary_rpc_method_handler(
+                    servicer.TouchSession,
+                    request_deserializer=seller__pb2.TouchSessionRequest.FromString,
+                    response_serializer=seller__pb2.TouchSessionResponse.SerializeToString,
+            ),
+            'GetSellerRating': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetSellerRating,
+                    request_deserializer=seller__pb2.GetSellerRatingRequest.FromString,
+                    response_serializer=seller__pb2.GetSellerRatingResponse.SerializeToString,
+            ),
+            'RegisterItem': grpc.unary_unary_rpc_method_handler(
+                    servicer.RegisterItem,
+                    request_deserializer=seller__pb2.RegisterItemRequest.FromString,
+                    response_serializer=seller__pb2.RegisterItemResponse.SerializeToString,
+            ),
+            'DisplayItems': grpc.unary_unary_rpc_method_handler(
+                    servicer.DisplayItems,
+                    request_deserializer=seller__pb2.DisplayItemsRequest.FromString,
+                    response_serializer=seller__pb2.DisplayItemsResponse.SerializeToString,
+            ),
+            'UpdateUnitsForSale': grpc.unary_unary_rpc_method_handler(
+                    servicer.UpdateUnitsForSale,
+                    request_deserializer=seller__pb2.UpdateUnitsForSaleRequest.FromString,
+                    response_serializer=seller__pb2.UpdateUnitsForSaleResponse.SerializeToString,
+            ),
+            'ChangeItemPrice': grpc.unary_unary_rpc_method_handler(
+                    servicer.ChangeItemPrice,
+                    request_deserializer=seller__pb2.ChangeItemPriceRequest.FromString,
+                    response_serializer=seller__pb2.ChangeItemPriceResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -86,6 +230,249 @@ class SellerService(object):
             '/seller.SellerService/CreateSeller',
             seller__pb2.CreateSellerRequest.SerializeToString,
             seller__pb2.CreateSellerResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def LoginSeller(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/seller.SellerService/LoginSeller',
+            seller__pb2.LoginSellerRequest.SerializeToString,
+            seller__pb2.LoginSellerResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def LogoutSeller(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/seller.SellerService/LogoutSeller',
+            seller__pb2.LogoutSellerRequest.SerializeToString,
+            seller__pb2.LogoutSellerResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ValidateSession(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/seller.SellerService/ValidateSession',
+            seller__pb2.ValidateSessionRequest.SerializeToString,
+            seller__pb2.ValidateSessionResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def TouchSession(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/seller.SellerService/TouchSession',
+            seller__pb2.TouchSessionRequest.SerializeToString,
+            seller__pb2.TouchSessionResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetSellerRating(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/seller.SellerService/GetSellerRating',
+            seller__pb2.GetSellerRatingRequest.SerializeToString,
+            seller__pb2.GetSellerRatingResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def RegisterItem(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/seller.SellerService/RegisterItem',
+            seller__pb2.RegisterItemRequest.SerializeToString,
+            seller__pb2.RegisterItemResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def DisplayItems(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/seller.SellerService/DisplayItems',
+            seller__pb2.DisplayItemsRequest.SerializeToString,
+            seller__pb2.DisplayItemsResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def UpdateUnitsForSale(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/seller.SellerService/UpdateUnitsForSale',
+            seller__pb2.UpdateUnitsForSaleRequest.SerializeToString,
+            seller__pb2.UpdateUnitsForSaleResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ChangeItemPrice(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/seller.SellerService/ChangeItemPrice',
+            seller__pb2.ChangeItemPriceRequest.SerializeToString,
+            seller__pb2.ChangeItemPriceResponse.FromString,
             options,
             channel_credentials,
             insecure,

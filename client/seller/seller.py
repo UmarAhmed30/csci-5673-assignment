@@ -203,7 +203,7 @@ class SellerClient:
             if items:
                 print(f"[OK] You have {len(items)} items for sale:")
                 for item in items:
-                    print(f"  - Item ID: {item.get('item_id')}, Name: {item.get('name')}, Price: ${item.get('price')}, Quantity: {item.get('quantity')}")
+                    print(f"  - Item ID: {item.get('item_id')}, Name: {item.get('item_name')}, Price: ${item.get('price')}, Quantity: {item.get('quantity')}")
             else:
                 print("[OK] No items for sale")
         else:

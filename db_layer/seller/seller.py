@@ -7,9 +7,9 @@ from pathlib import Path
 import uuid
 import time
 
-sys.path.insert(0, str(Path(__file__).parent.parent))
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from server.seller.config import SELLER_SERVER_CONFIG
+from db_layer.seller.config import SELLER_SERVER_CONFIG
 from db.client import CustomerDBClient, ProductDBClient
 
 SESSION_TIMEOUT_SECS = SELLER_SERVER_CONFIG["session_timeout_secs"]
