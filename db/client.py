@@ -9,19 +9,19 @@ from db.config import CUSTOMER_DB_CONFIG, PRODUCT_DB_CONFIG
 
 # mysql.connector defaults CNX_POOL_MAXSIZE to 32; must raise it before creating pools
 # Need to set it to at least the maximum pool size we're using
-_required_pool_cap = max(
-    CUSTOMER_DB_CONFIG["pool_size"],
-    PRODUCT_DB_CONFIG["pool_size"],
-    256,  # Set higher to support larger pools (default was 64, increased for high concurrency)
-)
-pooling.CNX_POOL_MAXSIZE = max(pooling.CNX_POOL_MAXSIZE, _required_pool_cap)
+# _required_pool_cap = max(
+#     CUSTOMER_DB_CONFIG["pool_size"],
+#     PRODUCT_DB_CONFIG["pool_size"],
+#     256,  # Set higher to support larger pools (default was 64, increased for high concurrency)
+# )
+# pooling.CNX_POOL_MAXSIZE = max(pooling.CNX_POOL_MAXSIZE, _required_pool_cap)
 
 class CustomerDBClient:
     """Database client for Customer Database (buyers, sellers, sessions)"""
     def __init__(self):
         self.pool = pooling.MySQLConnectionPool(
             pool_name="customer_db_pool",
-            pool_size=CUSTOMER_DB_CONFIG["pool_size"],
+            # pool_size=CUSTOMER_DB_CONFIG["pool_size"],
             host=CUSTOMER_DB_CONFIG["host"],
             port=CUSTOMER_DB_CONFIG["port"],
             user=CUSTOMER_DB_CONFIG["user"],
@@ -38,7 +38,7 @@ class ProductDBClient:
     def __init__(self):
         self.pool = pooling.MySQLConnectionPool(
             pool_name="product_db_pool",
-            pool_size=PRODUCT_DB_CONFIG["pool_size"],
+            # pool_size=PRODUCT_DB_CONFIG["pool_size"],
             host=PRODUCT_DB_CONFIG["host"],
             port=PRODUCT_DB_CONFIG["port"],
             user=PRODUCT_DB_CONFIG["user"],
