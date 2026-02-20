@@ -126,6 +126,8 @@ class BuyerClient:
             self.get_seller_rating(parts)
         elif parts[0] == "get_purchases":
             self.get_purchases()
+        elif parts[0] == "make_purchase":
+            self.make_purchase(parts)
         else:
             print("Unknown command. Type `help`.")
 
@@ -145,6 +147,9 @@ class BuyerClient:
     def login(self, parts):
         if len(parts) != 3:
             print("Usage: login <username> <password>")
+            return
+        if self.session_token:
+            print("[ERROR] Already logged in. Please logout first.")
             return
         resp = self.send("POST", "/api/buyers/login", {
             "username": parts[1],
@@ -322,11 +327,29 @@ class BuyerClient:
             if purchases:
                 print(f"[OK] Purchase history ({len(purchases)} items):")
                 for purchase in purchases:
-                    print(f"  - {purchase}")
+                    print(f"  - Item ID: {purchase.get('item_id')}, Quantity: {purchase.get('quantity')}, Timestamp: {purchase.get('timestamp')}")
             else:
                 print("[OK] No purchase history")
         else:
             print(f"[ERROR] {resp.get('message', 'Failed to get purchases')}")
+
+    def make_purchase(self, parts):
+        if len(parts) != 5:
+            print("Usage: make_purchase <card_holder_name> <card_number> <expiration_date> <security_code>")
+            return
+        resp = self.send("POST", "/api/purchases", {
+            "card_holder_name": parts[1],
+            "card_number": parts[2],
+            "expiration_date": parts[3],
+            "security_code": parts[4],
+        })
+        if resp["status"] == "ok":
+            print(f"[OK] {resp['data'].get('message', 'Purchase completed successfully')}")
+            items_purchased = resp['data'].get('items_purchased', 0)
+            if items_purchased:
+                print(f"  Items purchased: {items_purchased}")
+        else:
+            print(f"[ERROR] {resp.get('message', 'Purchase failed')}")
 
     def print_help(self):
         print("""
@@ -341,10 +364,11 @@ Commands:
 8.     display_cart
 9.     clear_cart
 10.    save_cart
-11.    rate_item <item_id> up|down
-12.    get_seller_rating <seller_id>
-13.    get_purchases
-14.    exit
+11.    make_purchase <card_holder_name> <card_number> <expiration_date> <security_code>
+12.    rate_item <item_id> up|down
+13.    get_seller_rating <seller_id>
+14.    get_purchases
+15.    exit
         """)
 
 def main():

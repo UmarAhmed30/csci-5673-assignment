@@ -6,3 +6,5 @@ requests
 spyne
 lxml
 zeep
+grpcio
+protobuf

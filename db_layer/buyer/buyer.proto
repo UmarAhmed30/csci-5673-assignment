@@ -167,6 +167,7 @@ message GetBuyerPurchasesRequest {
 message Purchase {
   int32  item_id   = 1;
   string timestamp = 2;
+  int32  quantity  = 3;
 }
 message GetBuyerPurchasesResponse {
   repeated Purchase purchases = 1;

@@ -136,6 +136,9 @@ class SellerClient:
         if len(parts) != 3:
             print("Usage: login <username> <password>")
             return
+        if self.session_token:
+            print("[ERROR] Already logged in. Please logout first.")
+            return
         resp = self.send("POST", "/api/sellers/login", {
             "username": parts[1],
             "password": parts[2],

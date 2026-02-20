@@ -75,6 +75,7 @@ CREATE TABLE cart (
 CREATE TABLE purchases (
     buyer_id INT,
     item_id INT,
+    quantity INT NOT NULL,
     timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 

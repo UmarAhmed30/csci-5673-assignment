@@ -136,7 +136,8 @@ class BuyerServicer(buyer_pb2_grpc.BuyerServiceServicer):
         purchases = [
             buyer_pb2.Purchase(
                 item_id=row["item_id"],
-                timestamp=str(row["timestamp"])
+                timestamp=str(row["timestamp"]),
+                quantity=row["quantity"]
             )
             for row in rows
         ]
@@ -482,7 +483,7 @@ def get_buyer_purchases(buyer_id):
     conn = product_db.get_connection()
     cur = conn.cursor(dictionary=True)
     cur.execute(
-        "SELECT item_id, timestamp FROM purchases WHERE buyer_id=%s",
+        "SELECT item_id, quantity, timestamp FROM purchases WHERE buyer_id=%s",
         (buyer_id,),
     )
     rows = cur.fetchall()
@@ -498,8 +499,8 @@ def make_purchase(buyer_id, cart_items):
     try:
         for item in cart_items:
             cur.execute(
-                "INSERT INTO purchases (buyer_id, item_id) VALUES (%s, %s)",
-                (buyer_id, item["item_id"])
+                "INSERT INTO purchases (buyer_id, item_id, quantity) VALUES (%s, %s, %s)",
+                (buyer_id, item["item_id"], item["quantity"])
             )
             # Decrease item quantity
             cur.execute(

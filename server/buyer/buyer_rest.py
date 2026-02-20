@@ -617,6 +617,7 @@ async def get_purchases_endpoint(buyer_id: int = Depends(get_current_buyer)):
         purchases = [
             {
                 "item_id": purchase.item_id,
+                "quantity": purchase.quantity,
                 "timestamp": purchase.timestamp
             }
             for purchase in response.purchases
