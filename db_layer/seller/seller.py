@@ -221,6 +221,8 @@ def register_item_for_sale(seller_id, item_name, item_category, condition_type, 
             return False, "Keyword length must be <= 8 characters"
     conn = product_db.get_connection()
     cur = conn.cursor(dictionary=True)
+    # Explicitly ensure we're using product_db
+    cur.execute("USE product_db")
     cur.execute(
         "INSERT INTO items (seller_id, item_name, category, condition_type, price, quantity) VALUES (%s, %s, %s, %s, %s, %s)",
         (seller_id, item_name, item_category, condition_type, salePrice, quantity),
@@ -237,6 +239,8 @@ def register_item_for_sale(seller_id, item_name, item_category, condition_type, 
 def display_items_for_sale(seller_id):
     conn = product_db.get_connection()
     cur = conn.cursor(dictionary=True)
+    # Explicitly ensure we're using product_db (in case connection was reused incorrectly)
+    cur.execute("USE product_db")
     cur.execute(
         "SELECT item_id, item_name, category, condition_type, price, quantity, thumbs_up, thumbs_down FROM items WHERE seller_id=%s",
         (seller_id,),
@@ -254,6 +258,8 @@ def update_units_for_sale(seller_id, item_id, quantity):
         return False, "Quantity to remove must be a positive integer"
     conn = product_db.get_connection()
     cur = conn.cursor(dictionary=True)
+    # Explicitly ensure we're using product_db
+    cur.execute("USE product_db")
     cur.execute(
         "SELECT quantity FROM items WHERE item_id=%s AND seller_id=%s",
         (item_id, seller_id),
@@ -282,6 +288,8 @@ def update_units_for_sale(seller_id, item_id, quantity):
 def change_item_price(seller_id, item_id, price):
     conn = product_db.get_connection()
     cur = conn.cursor(dictionary=True)
+    # Explicitly ensure we're using product_db
+    cur.execute("USE product_db")
     cur.execute(
         "UPDATE items SET price=%s WHERE item_id=%s AND seller_id=%s",
         (price, item_id, seller_id),

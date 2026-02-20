@@ -279,6 +279,8 @@ def touch_session(session_id):
 def search_items(category, keywords):
     conn = product_db.get_connection()
     cur = conn.cursor(dictionary=True)
+    # Explicitly ensure we're using product_db
+    cur.execute("USE product_db")
     base_query = """
         SELECT DISTINCT i.*
         FROM items i
@@ -305,6 +307,8 @@ def get_item(item_id):
         return None
     conn = product_db.get_connection()
     cur = conn.cursor(dictionary=True)
+    # Explicitly ensure we're using product_db
+    cur.execute("USE product_db")
     cur.execute(
         "SELECT * FROM items WHERE item_id=%s",
         (item_id,),
