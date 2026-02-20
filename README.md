@@ -112,22 +112,22 @@ Start services in the following order (each in a separate terminal):
 
 #### Backend Services (gRPC)
 ```bash
-# Start Seller gRPC Service (port 50051)
+# Start Seller gRPC Service
 python db_layer/seller/seller.py
 
-# Start Buyer gRPC Service (port 50052)
+# Start Buyer gRPC Service
 python db_layer/buyer/buyer.py
 ```
 
 #### Frontend Services (REST and SOAP)
 ```bash
-# Start Financial SOAP Service (port 8002)
+# Start Financial SOAP Service
 python server/financial/financial_soap.py
 
-# Start Buyer REST Server (port 8000)
+# Start Buyer REST Server
 python server/buyer/buyer_rest.py
 
-# Start Seller REST Server (port 8001)
+# Start Seller REST Server
 python server/seller/seller_rest.py
 ```
 
