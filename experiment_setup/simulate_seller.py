@@ -21,7 +21,7 @@ def simulate_seller(idx, thread_barrier, op):
     password = username
 
     # Create account
-    create_resp = client.send("create_account", {
+    create_resp = client.send("POST", "/api/sellers/register", {
         "username": username,
         "password": password
     })
@@ -30,7 +30,7 @@ def simulate_seller(idx, thread_barrier, op):
         return
 
     # Login
-    resp = client.send("login", {
+    resp = client.send("POST", "/api/sellers/login", {
         "username": username,
         "password": password
     })
@@ -38,7 +38,7 @@ def simulate_seller(idx, thread_barrier, op):
         client.close()
         return
 
-    client.session_id = resp["data"]["session_id"]
+    client.session_token = resp["data"]["token"]
     print(f"Thread-{idx} Logged in")
 
     latencies = []
@@ -51,7 +51,7 @@ def simulate_seller(idx, thread_barrier, op):
     if op == "display_items_for_sale":
         for _ in range(num_api_calls):
             t0 = time.perf_counter()
-            result = client.send("display_items_for_sale")
+            result = client.send("GET", "/api/sellers/items")
             t1 = time.perf_counter()
             if result:
                 latencies.append(t1 - t0)
@@ -59,10 +59,10 @@ def simulate_seller(idx, thread_barrier, op):
     elif op == "register_item_for_sale":
         for i in range(num_api_calls):
             t0 = time.perf_counter()
-            result = client.send("register_item_for_sale", {
-                "item_name": f"test_{unique_id}_{i}",
+            result = client.send("POST", "/api/sellers/items", {
+                "name": f"test_{unique_id}_{i}",
                 "category": 1,
-                "condition_type": "new",
+                "condition": "new",
                 "price": 1.0,
                 "quantity": 1,
                 "keywords": ["test"]

@@ -23,7 +23,7 @@ def simulate_buyer(idx, thread_barrier, op):
     password = username
 
     # Create account
-    create_resp = client.send("create_account", {
+    create_resp = client.send("POST", "/api/buyers/register", {
         "username": username,
         "password": password
     })
@@ -32,7 +32,7 @@ def simulate_buyer(idx, thread_barrier, op):
         return
 
     # Login
-    resp = client.send("login", {
+    resp = client.send("POST", "/api/buyers/login", {
         "username": username,
         "password": password
     })
@@ -40,7 +40,7 @@ def simulate_buyer(idx, thread_barrier, op):
         client.close()
         return
 
-    client.session_id = resp["data"]["session_id"]
+    client.session_token = resp["data"]["token"]
     print(f"Thread-{idx} Logged in")
 
     latencies = []
@@ -53,9 +53,7 @@ def simulate_buyer(idx, thread_barrier, op):
     if op == "get_seller_rating":
         for _ in range(NUM_API_CALLS):
             t0 = time.perf_counter()
-            result = client.send("get_seller_rating", {
-                "seller_id": 1
-            })
+            result = client.send("GET", "/api/sellers/1/rating")
             t1 = time.perf_counter()
             if result:
                 latencies.append(t1 - t0)
@@ -63,8 +61,9 @@ def simulate_buyer(idx, thread_barrier, op):
     elif op == "search_items":
         for _ in range(NUM_API_CALLS):
             t0 = time.perf_counter()
-            result = client.send("search_items", {
-                "keywords": ["test"]
+            result = client.send("GET", "/api/items/search", {
+                "category": "1",
+                "keywords": "test"
             })
             t1 = time.perf_counter()
             if result:
