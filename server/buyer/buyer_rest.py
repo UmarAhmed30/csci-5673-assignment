@@ -5,6 +5,8 @@ from typing import Optional
 import grpc
 import buyer_pb2
 import buyer_pb2_grpc
+import re
+from datetime import datetime
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
@@ -164,6 +166,67 @@ class PurchaseRequest(BaseModel):
     card_number: str
     expiration_date: str
     security_code: str
+
+
+def validate_card_number(card_number: str) -> tuple[bool, str]:
+    # Remove spaces and hyphens
+    card_number = card_number.replace(" ", "").replace("-", "")
+    # Check if all characters are digits
+    if not card_number.isdigit():
+        return False, "Card number must contain only digits"
+    # Check length (standard card numbers are 13-19 digits)
+    if len(card_number) < 13 or len(card_number) > 19:
+        return False, "Card number must be between 13 and 19 digits"
+    return True, ""
+
+
+def validate_expiration_date(expiration_date: str) -> tuple[bool, str]:
+    # Check format MM/YY
+    if len(expiration_date) != 5 or expiration_date[2] != '/':
+        return False, "Expiration date must be in MM/YY format (e.g., 12/25)"
+    try:
+        month_str, year_str = expiration_date.split('/')
+        month = int(month_str)
+        year = int(year_str)
+        # Validate month range
+        if month < 1 or month > 12:
+            return False, "Invalid expiration month. Month must be between 01 and 12"
+        # Convert YY to YYYY (assuming 20YY for years 00-99)
+        full_year = 2000 + year
+        # Check if card is expired
+        current_date = datetime.now()
+        expiration_datetime = datetime(full_year, month, 1)
+        # Card expires at the end of the expiration month
+        if expiration_datetime < current_date.replace(day=1):
+            return False, "Card has expired. Please use a valid card"
+        return True, ""
+    except ValueError:
+        return False, "Invalid expiration date format. Use MM/YY (e.g., 12/25)"
+
+
+def validate_security_code(security_code: str) -> tuple[bool, str]:
+    # Remove spaces
+    security_code = security_code.strip()
+    if not security_code.isdigit():
+        return False, "Security code must contain only digits"
+    if len(security_code) < 3 or len(security_code) > 4:
+        return False, "Security code must be 3 or 4 digits"
+    return True, ""
+
+
+def validate_card_holder_name(name: str) -> tuple[bool, str]:
+    if not name or not name.strip():
+        return False, "Card holder name is required"
+    # Check minimum length
+    if len(name.strip()) < 2:
+        return False, "Card holder name must be at least 2 characters"
+    # Check maximum length (reasonable limit)
+    if len(name) > 50:
+        return False, "Card holder name is too long (maximum 50 characters)"
+    # Allow letters, spaces, hyphens, apostrophes, and periods (common in names)
+    if not re.match(r"^[a-zA-Z\s\-'\.]+$", name):
+        return False, "Card holder name can only contain letters, spaces, hyphens, apostrophes, and periods"
+    return True, ""
 
 
 @app.post("/api/buyers/register", status_code=201, response_model=AuthResponse)
@@ -492,9 +555,36 @@ async def make_purchase(
         if not cart_response.items:
             logger.warning(f"Purchase failed: Empty cart for buyer_id={buyer_id}")
             raise HTTPException(status_code=400, detail="Cart is empty")
+
+        # Validate all credit card fields
         if not request.card_holder_name or not request.card_number or not request.expiration_date or not request.security_code:
             logger.warning("Purchase failed: Missing credit card information")
             raise HTTPException(status_code=400, detail="All credit card fields are required")
+
+        # Validate card holder name
+        is_valid, error_msg = validate_card_holder_name(request.card_holder_name)
+        if not is_valid:
+            logger.warning(f"Purchase failed: Invalid card holder name - {error_msg}")
+            raise HTTPException(status_code=400, detail=error_msg)
+
+        # Validate card number
+        is_valid, error_msg = validate_card_number(request.card_number)
+        if not is_valid:
+            logger.warning(f"Purchase failed: Invalid card number - {error_msg}")
+            raise HTTPException(status_code=400, detail=error_msg)
+
+        # Validate expiration date
+        is_valid, error_msg = validate_expiration_date(request.expiration_date)
+        if not is_valid:
+            logger.warning(f"Purchase failed: Invalid expiration date - {error_msg}")
+            raise HTTPException(status_code=400, detail=error_msg)
+
+        # Validate security code
+        is_valid, error_msg = validate_security_code(request.security_code)
+        if not is_valid:
+            logger.warning(f"Purchase failed: Invalid security code - {error_msg}")
+            raise HTTPException(status_code=400, detail=error_msg)
+
         try:
             soap_client = SoapClient('http://localhost:8002/?wsdl')
             result = soap_client.service.process_transaction(
@@ -507,10 +597,13 @@ async def make_purchase(
                 logger.warning(f"Purchase failed: Transaction declined for buyer_id={buyer_id}")
                 raise HTTPException(status_code=402, detail="Payment declined. Please check your card details and try again.")
             logger.info(f"Transaction approved for buyer_id={buyer_id}")
+        except HTTPException:
+            # Re-raise HTTPException to preserve status codes and error messages
+            raise
         except Exception as e:
             logger.error(f"Financial service error: {str(e)}", exc_info=True)
             raise HTTPException(status_code=503, detail="Financial service unavailable. Please try again later.")
-        
+
         # Convert cart items to protobuf format
         cart_items_pb = [
             buyer_pb2.CartItem(
@@ -520,7 +613,7 @@ async def make_purchase(
             )
             for item in cart_response.items
         ]
-        
+
         # Make purchase via gRPC (records purchases and decreases quantities)
         purchase_response = stub.MakePurchase(
             buyer_pb2.MakePurchaseRequest(
@@ -528,10 +621,11 @@ async def make_purchase(
                 cart_items=cart_items_pb
             )
         )
+
         if not purchase_response.success:
             logger.warning(f"Purchase failed: {purchase_response.message}")
             raise HTTPException(status_code=500, detail=purchase_response.message)
-        
+
         # Clear cart after successful purchase
         stub.ClearCart(buyer_pb2.ClearCartRequest(buyer_id=buyer_id))
         logger.info(f"Purchase successful: buyer_id={buyer_id}, items={purchase_response.items_purchased}")
