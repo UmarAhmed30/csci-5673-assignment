@@ -9,7 +9,7 @@ import time
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from db_layer.seller.config import SELLER_SERVER_CONFIG
+from db_layer.seller.config import SELLER_SERVER_CONFIG, SELLER_GRPC_CONFIG
 from db.client import CustomerDBClient, ProductDBClient
 
 SESSION_TIMEOUT_SECS = SELLER_SERVER_CONFIG["session_timeout_secs"]
@@ -293,11 +293,13 @@ def change_item_price(seller_id, item_id, price):
 
 
 def serve():
+    host = SELLER_GRPC_CONFIG["host"]
+    port = SELLER_GRPC_CONFIG["port"]
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
     seller_pb2_grpc.add_SellerServiceServicer_to_server(SellerServicer(), server)
-    server.add_insecure_port("[::]:50051")
+    server.add_insecure_port(f"{host}:{port}")
     server.start()
-    print("Server started on port 50051")
+    print(f"Server started on {host}:{port}")
     server.wait_for_termination()
 
 

@@ -9,7 +9,7 @@ import time
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from db_layer.buyer.config import BUYER_SERVER_CONFIG
+from db_layer.buyer.config import BUYER_SERVER_CONFIG, BUYER_GRPC_CONFIG
 from db.client import CustomerDBClient, ProductDBClient
 
 SESSION_TIMEOUT_SECS = BUYER_SERVER_CONFIG["session_timeout_secs"]
@@ -518,11 +518,13 @@ def make_purchase(buyer_id, cart_items):
 
 
 def serve():
+    host = BUYER_GRPC_CONFIG["host"]
+    port = BUYER_GRPC_CONFIG["port"]
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
     buyer_pb2_grpc.add_BuyerServiceServicer_to_server(BuyerServicer(), server)
-    server.add_insecure_port("[::]:50052")
+    server.add_insecure_port(f"{host}:{port}")
     server.start()
-    print("Buyer gRPC Server started on port 50052")
+    print(f"Buyer gRPC Server started on {host}:{port}")
     server.wait_for_termination()
 
 

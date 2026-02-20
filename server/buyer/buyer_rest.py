@@ -15,7 +15,7 @@ from typing import Literal
 import mysql.connector
 from zeep import Client as SoapClient
 
-from server.buyer.config import BUYER_SERVER_CONFIG
+from server.buyer.config import BUYER_SERVER_CONFIG, BUYER_GRPC_CONFIG
 
 logging.basicConfig(
     level=logging.INFO,
@@ -24,7 +24,8 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # gRPC channel and stub
-channel = grpc.insecure_channel("localhost:50052")
+grpc_address = f"{BUYER_GRPC_CONFIG['host']}:{BUYER_GRPC_CONFIG['port']}"
+channel = grpc.insecure_channel(grpc_address)
 stub = buyer_pb2_grpc.BuyerServiceStub(channel)
 
 app = FastAPI(

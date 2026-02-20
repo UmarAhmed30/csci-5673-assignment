@@ -8,3 +8,9 @@ SELLER_SERVER_CONFIG = {
     "port": int(os.getenv("SELLER_SERVER_PORT")),
     "session_timeout_secs": int(os.getenv("SESSION_TIMEOUT_SECS"))
 }
+
+# gRPC connection config (for REST server to connect to gRPC server)
+SELLER_GRPC_CONFIG = {
+    "host": os.getenv("SELLER_GRPC_HOST", "localhost"),
+    "port": int(os.getenv("SELLER_GRPC_PORT", "50051")),
+}

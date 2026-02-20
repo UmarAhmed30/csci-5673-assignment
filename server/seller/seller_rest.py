@@ -13,7 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import mysql.connector
 
-from server.seller.config import SELLER_SERVER_CONFIG
+from server.seller.config import SELLER_SERVER_CONFIG, SELLER_GRPC_CONFIG
 
 logging.basicConfig(
     level=logging.INFO,
@@ -22,7 +22,8 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # gRPC channel and stub
-channel = grpc.insecure_channel("localhost:50051")
+grpc_address = f"{SELLER_GRPC_CONFIG['host']}:{SELLER_GRPC_CONFIG['port']}"
+channel = grpc.insecure_channel(grpc_address)
 stub = seller_pb2_grpc.SellerServiceStub(channel)
 
 app = FastAPI(
