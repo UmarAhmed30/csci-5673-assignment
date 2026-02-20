@@ -7,11 +7,13 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from db.config import CUSTOMER_DB_CONFIG, PRODUCT_DB_CONFIG
 
-pooling.CNX_POOL_MAXSIZE = max(
-    getattr(pooling, "CNX_POOL_MAXSIZE", 150),
+# mysql.connector defaults CNX_POOL_MAXSIZE to 32; must raise it before creating pools
+_required_pool_cap = max(
     CUSTOMER_DB_CONFIG["pool_size"],
     PRODUCT_DB_CONFIG["pool_size"],
+    64,  # minimum above default 32 to avoid "capped at 32" error
 )
+pooling.CNX_POOL_MAXSIZE = max(pooling.CNX_POOL_MAXSIZE, _required_pool_cap)
 
 class CustomerDBClient:
     """Database client for Customer Database (buyers, sellers, sessions)"""
