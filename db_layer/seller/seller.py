@@ -95,8 +95,6 @@ class SellerServicer(seller_pb2_grpc.SellerServiceServicer):
         return seller_pb2.ChangeItemPriceResponse(success=success, message=message)
 
 
-# --- db functions unchanged below ---
-
 def create_seller(username, password):
     if len(username) > 32:
         return None, "Username must be 32 characters or less"
@@ -221,7 +219,6 @@ def register_item_for_sale(seller_id, item_name, item_category, condition_type, 
             return False, "Keyword length must be <= 8 characters"
     conn = product_db.get_connection()
     cur = conn.cursor(dictionary=True)
-    # Explicitly ensure we're using product_db
     cur.execute("USE product_db")
     cur.execute(
         "INSERT INTO items (seller_id, item_name, category, condition_type, price, quantity) VALUES (%s, %s, %s, %s, %s, %s)",
@@ -239,7 +236,6 @@ def register_item_for_sale(seller_id, item_name, item_category, condition_type, 
 def display_items_for_sale(seller_id):
     conn = product_db.get_connection()
     cur = conn.cursor(dictionary=True)
-    # Explicitly ensure we're using product_db (in case connection was reused incorrectly)
     cur.execute("USE product_db")
     cur.execute(
         "SELECT item_id, item_name, category, condition_type, price, quantity, thumbs_up, thumbs_down FROM items WHERE seller_id=%s",
@@ -258,7 +254,6 @@ def update_units_for_sale(seller_id, item_id, quantity):
         return False, "Quantity to remove must be a positive integer"
     conn = product_db.get_connection()
     cur = conn.cursor(dictionary=True)
-    # Explicitly ensure we're using product_db
     cur.execute("USE product_db")
     cur.execute(
         "SELECT quantity FROM items WHERE item_id=%s AND seller_id=%s",
@@ -288,7 +283,6 @@ def update_units_for_sale(seller_id, item_id, quantity):
 def change_item_price(seller_id, item_id, price):
     conn = product_db.get_connection()
     cur = conn.cursor(dictionary=True)
-    # Explicitly ensure we're using product_db
     cur.execute("USE product_db")
     cur.execute(
         "UPDATE items SET price=%s WHERE item_id=%s AND seller_id=%s",

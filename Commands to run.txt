@@ -1,8 +1,0 @@
-
-source venv/bin/activate
-
-python -m grpc_tools.protoc -I. --python_out=. --grpc_python_out=. seller.proto
-
-python3 db_layer/seller/seller.py
-python3 server/seller/seller_rest.py
-python3 client/seller/seller.py

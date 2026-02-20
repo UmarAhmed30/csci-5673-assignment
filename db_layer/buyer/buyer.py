@@ -157,8 +157,6 @@ class BuyerServicer(buyer_pb2_grpc.BuyerServiceServicer):
         )
 
 
-# --- db functions unchanged below ---
-
 def create_buyer(username, password):
     if len(username) > 32:
         return None, "Username must be 32 characters or less"
@@ -279,7 +277,6 @@ def touch_session(session_id):
 def search_items(category, keywords):
     conn = product_db.get_connection()
     cur = conn.cursor(dictionary=True)
-    # Explicitly ensure we're using product_db
     cur.execute("USE product_db")
     base_query = """
         SELECT DISTINCT i.*
@@ -307,7 +304,6 @@ def get_item(item_id):
         return None
     conn = product_db.get_connection()
     cur = conn.cursor(dictionary=True)
-    # Explicitly ensure we're using product_db
     cur.execute("USE product_db")
     cur.execute(
         "SELECT * FROM items WHERE item_id=%s",
@@ -497,7 +493,6 @@ def get_buyer_purchases(buyer_id):
 
 
 def make_purchase(buyer_id, cart_items):
-    """Record purchase in database and decrease item quantities"""
     conn = product_db.get_connection()
     cur = conn.cursor()
     try:
@@ -506,7 +501,6 @@ def make_purchase(buyer_id, cart_items):
                 "INSERT INTO purchases (buyer_id, item_id, quantity) VALUES (%s, %s, %s)",
                 (buyer_id, item["item_id"], item["quantity"])
             )
-            # Decrease item quantity
             cur.execute(
                 "UPDATE items SET quantity = quantity - %s WHERE item_id = %s",
                 (item["quantity"], item["item_id"])
