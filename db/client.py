@@ -12,7 +12,7 @@ from db.config import CUSTOMER_DB_CONFIG, PRODUCT_DB_CONFIG
 _required_pool_cap = max(
     CUSTOMER_DB_CONFIG["pool_size"],
     PRODUCT_DB_CONFIG["pool_size"],
-    256,  # Set higher to support larger pools (default was 64, increased for high concurrency)
+    32,  # Set higher to support larger pools (default was 64, increased for high concurrency)
 )
 pooling.CNX_POOL_MAXSIZE = max(pooling.CNX_POOL_MAXSIZE, _required_pool_cap)
 

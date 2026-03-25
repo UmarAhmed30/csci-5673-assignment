@@ -180,10 +180,11 @@ def create_buyer(username, password):
 
 
 def login_buyer(username, password):
-    conn = customer_db.get_connection()
+    conn = customer_db
+    .get_connection()
     cur = conn.cursor(dictionary=True)
     cur.execute(
-        "SELECT buyer_id FROM buyers WHERE buyer_name=%s AND password=%s",
+        "SELECT buyer_id FROM buyers WHERE buyer_name=%s AND password=%s LIMIT 1",
         (username, password),
     )
     row = cur.fetchone()
