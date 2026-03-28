@@ -75,6 +75,13 @@ class SellerClient:
 
                 if response.status_code in [200, 201]:
                     return {"status": "ok", "data": data}
+                elif response.status_code in [503, 504]:
+                    # Replica is unavailable or timed out at the server — failover.
+                    if attempt < len(self._replicas) - 1:
+                        print(f"[SELLER][CLIENT] Replica {self._replica_idx} returned {response.status_code}, failing over...")
+                        self._next_replica()
+                        continue
+                    return {"status": "error", "message": data.get("detail", "Service unavailable")}
                 elif response.status_code == 400:
                     return {"status": "error", "message": data.get("detail", "Bad request")}
                 elif response.status_code == 401:
@@ -99,7 +106,11 @@ class SellerClient:
                 else:
                     return {"status": "error", "message": "All seller server replicas unreachable"}
             except requests.exceptions.Timeout:
-                return {"status": "error", "message": "Request timeout"}
+                if attempt < len(self._replicas) - 1:
+                    print(f"[SELLER][CLIENT] Replica {self._replica_idx} timed out, failing over...")
+                    self._next_replica()
+                else:
+                    return {"status": "error", "message": "All seller server replicas timed out"}
             except Exception as e:
                 return {"status": "error", "message": f"Request failed: {str(e)}"}
 

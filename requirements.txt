@@ -7,4 +7,6 @@ spyne
 lxml
 zeep
 grpcio
+grpcio-tools
 protobuf
+pysyncobj

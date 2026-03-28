@@ -9,15 +9,20 @@ import random
 import time
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+# db_layer/product/ must be on sys.path for `import product_pb2` to resolve.
+sys.path.insert(0, str(Path(__file__).parent.parent / "product"))
 
 from db_layer.seller.config import SELLER_SERVER_CONFIG, SELLER_GRPC_CONFIG
-from db.client import CustomerDBClient, ProductDBClient
+from db.client import CustomerDBClient
 from broadcast.node import BroadcastNode
+from db_layer.product.product_client import ResilientProductStub
+
+import product_pb2
 
 SESSION_TIMEOUT_SECS = SELLER_SERVER_CONFIG["session_timeout_secs"]
 
-customer_db = CustomerDBClient()
-product_db = ProductDBClient()
+customer_db  = CustomerDBClient()
+product_stub = ResilientProductStub()
 
 
 # ---------------------------------------------------------------------------
@@ -25,13 +30,6 @@ product_db = ProductDBClient()
 # ---------------------------------------------------------------------------
 
 def apply_operation(payload: dict):
-    """
-    Delivery callback invoked by BroadcastNode._delivery_loop for each
-    committed write operation, in global sequence order.
-
-    Returns a value that is forwarded to the waiting gRPC thread via a Future.
-    Raises on unrecoverable failure.
-    """
     op   = payload["op"]
     args = payload["args"]
 
@@ -56,12 +54,6 @@ broadcast_node: BroadcastNode = BroadcastNode(apply_fn=apply_operation)
 
 
 def _wait_for_read_consistency():
-    """
-    Block the calling thread until all pending Sequence messages in the
-    broadcast store have been delivered and applied to the local DB.
-
-    This prevents stale reads, mirroring the buyer implementation.
-    """
     while broadcast_node.has_pending_deliveries():
         time.sleep(0.001)
 
@@ -75,7 +67,6 @@ class SellerServicer(seller_pb2_grpc.SellerServiceServicer):
     # -- writes that touch customer_db → go through atomic broadcast ----------
 
     def CreateSeller(self, request, context):
-        # Pre-generate seller_id so every replica inserts the same value.
         new_seller_id = random.randint(1, 2**31 - 1)
         result = broadcast_node.broadcast_request({
             "op": "create_seller",
@@ -92,7 +83,6 @@ class SellerServicer(seller_pb2_grpc.SellerServiceServicer):
         )
 
     def LoginSeller(self, request, context):
-        # Pre-generate session_id so every replica inserts the same session row.
         session_id = str(uuid.uuid4())
         result = broadcast_node.broadcast_request({
             "op": "login_seller",
@@ -139,46 +129,102 @@ class SellerServicer(seller_pb2_grpc.SellerServiceServicer):
             thumbs_down=row["thumbs_down"],
         )
 
-    # -- product_db operations → direct (Raft scope, not broadcast) ----------
+    # -- product operations → via Raft-replicated product gRPC service -------
 
     def RegisterItem(self, request, context):
-        success, result = register_item_for_sale(
-            request.seller_id,
-            request.item_name,
-            request.item_category,
-            request.condition_type,
-            request.sale_price,
-            request.quantity,
-            list(request.keywords)
+        # Pre-generate item_id so all product replicas insert the same row.
+        new_item_id = random.randint(1, 2**31 - 1)
+
+        # Validate inputs before sending to Raft (fail fast without burning consensus).
+        if len(request.item_name) > 32:
+            return seller_pb2.RegisterItemResponse(
+                success=False, item_id=0, message="Item name must be 32 characters or less"
+            )
+        if request.item_category <= 0:
+            return seller_pb2.RegisterItemResponse(
+                success=False, item_id=0, message="Category must be a positive integer"
+            )
+        if request.quantity <= 0:
+            return seller_pb2.RegisterItemResponse(
+                success=False, item_id=0, message="Quantity must be a positive integer"
+            )
+        if request.sale_price <= 0:
+            return seller_pb2.RegisterItemResponse(
+                success=False, item_id=0, message="Price must be a positive number"
+            )
+        for kw in request.keywords:
+            if len(kw) > 8:
+                return seller_pb2.RegisterItemResponse(
+                    success=False, item_id=0,
+                    message="Keyword length must be <= 8 characters"
+                )
+
+        resp = product_stub.RegisterItem(
+            product_pb2.RegisterItemRequest(
+                item_id=new_item_id,
+                seller_id=request.seller_id,
+                item_name=request.item_name,
+                category=request.item_category,
+                condition_type=request.condition_type,
+                price=request.sale_price,
+                quantity=request.quantity,
+                keywords=list(request.keywords),
+            )
         )
-        if not success:
-            return seller_pb2.RegisterItemResponse(success=False, item_id=0, message=result)
-        return seller_pb2.RegisterItemResponse(success=True, item_id=result["item_id"], message="OK")
+        return seller_pb2.RegisterItemResponse(
+            success=resp.success, item_id=resp.item_id, message=resp.message
+        )
 
     def DisplayItems(self, request, context):
-        rows = display_items_for_sale(request.seller_id)
+        resp = product_stub.DisplayItems(
+            product_pb2.DisplayItemsRequest(seller_id=request.seller_id)
+        )
         items = [
             seller_pb2.Item(
-                item_id=row["item_id"],
-                item_name=row["item_name"],
-                category=row["category"],
-                condition_type=row["condition_type"],
-                price=row["price"],
-                quantity=row["quantity"],
-                thumbs_up=row["thumbs_up"],
-                thumbs_down=row["thumbs_down"]
+                item_id=i.item_id,
+                item_name=i.item_name,
+                category=i.category,
+                condition_type=i.condition_type,
+                price=i.price,
+                quantity=i.quantity,
+                thumbs_up=i.thumbs_up,
+                thumbs_down=i.thumbs_down,
             )
-            for row in rows
+            for i in resp.items
         ]
         return seller_pb2.DisplayItemsResponse(items=items)
 
     def UpdateUnitsForSale(self, request, context):
-        success, message = update_units_for_sale(request.seller_id, request.item_id, request.quantity)
-        return seller_pb2.UpdateUnitsForSaleResponse(success=success, message=message)
+        if not isinstance(request.item_id, int) or request.item_id <= 0:
+            return seller_pb2.UpdateUnitsForSaleResponse(
+                success=False, message="Item ID must be a positive integer"
+            )
+        if not isinstance(request.quantity, int) or request.quantity <= 0:
+            return seller_pb2.UpdateUnitsForSaleResponse(
+                success=False, message="Quantity to remove must be a positive integer"
+            )
+        resp = product_stub.UpdateUnitsForSale(
+            product_pb2.UpdateUnitsForSaleRequest(
+                seller_id=request.seller_id,
+                item_id=request.item_id,
+                quantity=request.quantity,
+            )
+        )
+        return seller_pb2.UpdateUnitsForSaleResponse(
+            success=resp.success, message=resp.message
+        )
 
     def ChangeItemPrice(self, request, context):
-        success, message = change_item_price(request.seller_id, request.item_id, request.price)
-        return seller_pb2.ChangeItemPriceResponse(success=success, message=message)
+        resp = product_stub.ChangeItemPrice(
+            product_pb2.ChangeItemPriceRequest(
+                seller_id=request.seller_id,
+                item_id=request.item_id,
+                price=request.price,
+            )
+        )
+        return seller_pb2.ChangeItemPriceResponse(
+            success=resp.success, message=resp.message
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -186,10 +232,6 @@ class SellerServicer(seller_pb2_grpc.SellerServiceServicer):
 # ---------------------------------------------------------------------------
 
 def create_seller_replicated(seller_id, username, password):
-    """
-    Insert a seller with a pre-determined seller_id so all replicas produce
-    the same row.  The caller (broadcast originator) pre-generates the ID.
-    """
     if len(username) > 32:
         return None, "Username must be 32 characters or less"
     conn = customer_db.get_connection()
@@ -211,11 +253,6 @@ def create_seller_replicated(seller_id, username, password):
 
 
 def login_seller_replicated(username, password, session_id):
-    """
-    Validate credentials and insert the pre-determined session_id so all
-    replicas insert the same session row.
-    Returns session_id on success, None on bad credentials.
-    """
     conn = customer_db.get_connection()
     cur  = conn.cursor(dictionary=True)
     cur.execute(
@@ -245,9 +282,6 @@ def login_seller_replicated(username, password, session_id):
 
 
 def delete_seller_session_replicated(session_id):
-    """
-    Delete the session row from customer_db (user_type='seller').
-    """
     conn = customer_db.get_connection()
     cur  = conn.cursor()
     cur.execute(
@@ -260,7 +294,7 @@ def delete_seller_session_replicated(session_id):
 
 
 # ---------------------------------------------------------------------------
-# customer_db read functions (unchanged — no broadcast needed)
+# customer_db read functions
 # ---------------------------------------------------------------------------
 
 def validate_session(session_id):
@@ -283,15 +317,12 @@ def validate_session(session_id):
     if not row:
         return None
     if time.time() - row["last_active"] > SESSION_TIMEOUT_SECS:
-        # Expired — delete directly on this replica only (best-effort; will
-        # propagate on the next touch/logout from the client).
         _delete_seller_session_direct(session_id)
         return None
     return row["user_id"]
 
 
 def _delete_seller_session_direct(session_id):
-    """Local-only session cleanup (used for expiry; not replicated)."""
     conn = customer_db.get_connection()
     cur  = conn.cursor()
     cur.execute(
@@ -326,105 +357,6 @@ def get_seller_rating(seller_id):
     cur.close()
     conn.close()
     return row
-
-
-# ---------------------------------------------------------------------------
-# product_db functions (unchanged — not part of customer DB replication)
-# ---------------------------------------------------------------------------
-
-def register_item_for_sale(seller_id, item_name, item_category, condition_type, salePrice, quantity, keywords):
-    if len(item_name) > 32:
-        return False, "Item name must be 32 characters or less"
-    try:
-        item_category = int(item_category)
-        quantity = int(quantity)
-        salePrice = float(salePrice)
-    except (ValueError, TypeError):
-        return False, "Invalid category, quantity, or price format"
-    if item_category <= 0:
-        return False, "Category must be a positive integer"
-    if quantity <= 0:
-        return False, "Quantity must be a positive integer"
-    if salePrice <= 0:
-        return False, "Price must be a positive number"
-    for kw in keywords:
-        if len(kw) > 8:
-            return False, "Keyword length must be <= 8 characters"
-    conn = product_db.get_connection()
-    cur = conn.cursor(dictionary=True)
-    cur.execute("USE product_db")
-    cur.execute(
-        "INSERT INTO items (seller_id, item_name, category, condition_type, price, quantity) VALUES (%s, %s, %s, %s, %s, %s)",
-        (seller_id, item_name, item_category, condition_type, salePrice, quantity),
-    )
-    item_id = cur.lastrowid
-    for kw in keywords:
-        cur.execute("INSERT INTO item_keywords (item_id, keyword) VALUES (%s, %s)", (item_id, kw))
-    conn.commit()
-    cur.close()
-    conn.close()
-    return True, {"item_id": item_id}
-
-
-def display_items_for_sale(seller_id):
-    conn = product_db.get_connection()
-    cur = conn.cursor(dictionary=True)
-    cur.execute("USE product_db")
-    cur.execute(
-        "SELECT item_id, item_name, category, condition_type, price, quantity, thumbs_up, thumbs_down FROM items WHERE seller_id=%s",
-        (seller_id,),
-    )
-    rows = cur.fetchall()
-    cur.close()
-    conn.close()
-    return rows
-
-
-def update_units_for_sale(seller_id, item_id, quantity):
-    if not isinstance(item_id, int) or item_id <= 0:
-        return False, "Item ID must be a positive integer"
-    if not isinstance(quantity, int) or quantity <= 0:
-        return False, "Quantity to remove must be a positive integer"
-    conn = product_db.get_connection()
-    cur = conn.cursor(dictionary=True)
-    cur.execute("USE product_db")
-    cur.execute(
-        "SELECT quantity FROM items WHERE item_id=%s AND seller_id=%s",
-        (item_id, seller_id),
-    )
-    row = cur.fetchone()
-    if not row:
-        cur.close()
-        conn.close()
-        return False, "Item not found or does not belong to you"
-    current_quantity = row['quantity']
-    if quantity > current_quantity:
-        cur.close()
-        conn.close()
-        return False, f"Cannot remove {quantity} units. Only {current_quantity} available"
-    new_quantity = current_quantity - quantity
-    cur.execute(
-        "UPDATE items SET quantity=%s WHERE item_id=%s AND seller_id=%s",
-        (new_quantity, item_id, seller_id),
-    )
-    conn.commit()
-    cur.close()
-    conn.close()
-    return True, f"Removed {quantity} units. New quantity: {new_quantity}"
-
-
-def change_item_price(seller_id, item_id, price):
-    conn = product_db.get_connection()
-    cur = conn.cursor(dictionary=True)
-    cur.execute("USE product_db")
-    cur.execute(
-        "UPDATE items SET price=%s WHERE item_id=%s AND seller_id=%s",
-        (price, item_id, seller_id),
-    )
-    conn.commit()
-    cur.close()
-    conn.close()
-    return True, "UPDATED"
 
 
 # ---------------------------------------------------------------------------
