@@ -13,3 +13,5 @@ SELLER_GRPC_CONFIG = {
     "host": os.getenv("SELLER_GRPC_BIND_HOST", "0.0.0.0"),
     "port": int(os.getenv("SELLER_GRPC_PORT", "50051")),
 }
+
+MY_NODE_ID = int(os.getenv("MY_NODE_ID", "0"))

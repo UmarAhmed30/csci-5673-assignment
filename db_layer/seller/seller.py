@@ -5,12 +5,14 @@ import seller_pb2_grpc
 import sys
 from pathlib import Path
 import uuid
+import random
 import time
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from db_layer.seller.config import SELLER_SERVER_CONFIG, SELLER_GRPC_CONFIG
 from db.client import CustomerDBClient, ProductDBClient
+from broadcast.node import BroadcastNode
 
 SESSION_TIMEOUT_SECS = SELLER_SERVER_CONFIG["session_timeout_secs"]
 
@@ -18,42 +20,126 @@ customer_db = CustomerDBClient()
 product_db = ProductDBClient()
 
 
+# ---------------------------------------------------------------------------
+# Broadcast node — started in serve(), used by SellerServicer write methods
+# ---------------------------------------------------------------------------
+
+def apply_operation(payload: dict):
+    """
+    Delivery callback invoked by BroadcastNode._delivery_loop for each
+    committed write operation, in global sequence order.
+
+    Returns a value that is forwarded to the waiting gRPC thread via a Future.
+    Raises on unrecoverable failure.
+    """
+    op   = payload["op"]
+    args = payload["args"]
+
+    if op == "create_seller":
+        return create_seller_replicated(
+            args["seller_id"], args["username"], args["password"]
+        )
+    if op == "login_seller":
+        return login_seller_replicated(
+            args["username"], args["password"], args["session_id"]
+        )
+    if op == "logout_session":
+        return delete_seller_session_replicated(args["session_id"])
+    if op == "touch_session":
+        touch_session(args["session_id"])
+        return None
+
+    raise ValueError(f"apply_operation: unknown op {op!r}")
+
+
+broadcast_node: BroadcastNode = BroadcastNode(apply_fn=apply_operation)
+
+
+def _wait_for_read_consistency():
+    """
+    Block the calling thread until all pending Sequence messages in the
+    broadcast store have been delivered and applied to the local DB.
+
+    This prevents stale reads, mirroring the buyer implementation.
+    """
+    while broadcast_node.has_pending_deliveries():
+        time.sleep(0.001)
+
+
+# ---------------------------------------------------------------------------
+# gRPC servicer
+# ---------------------------------------------------------------------------
+
 class SellerServicer(seller_pb2_grpc.SellerServiceServicer):
+
+    # -- writes that touch customer_db → go through atomic broadcast ----------
+
     def CreateSeller(self, request, context):
-        seller_id, message = create_seller(request.username, request.password)
+        # Pre-generate seller_id so every replica inserts the same value.
+        new_seller_id = random.randint(1, 2**31 - 1)
+        result = broadcast_node.broadcast_request({
+            "op": "create_seller",
+            "args": {
+                "seller_id": new_seller_id,
+                "username":  request.username,
+                "password":  request.password,
+            },
+        })
+        seller_id, message = result
         return seller_pb2.CreateSellerResponse(
             seller_id=seller_id if seller_id is not None else 0,
-            message=message
+            message=message,
         )
 
     def LoginSeller(self, request, context):
-        session_id = login_seller(request.username, request.password)
+        # Pre-generate session_id so every replica inserts the same session row.
+        session_id = str(uuid.uuid4())
+        result = broadcast_node.broadcast_request({
+            "op": "login_seller",
+            "args": {
+                "username":   request.username,
+                "password":   request.password,
+                "session_id": session_id,
+            },
+        })
         return seller_pb2.LoginSellerResponse(
-            session_id=session_id if session_id is not None else ""
+            session_id=result if result is not None else ""
         )
 
     def LogoutSeller(self, request, context):
-        logout_seller(request.session_id)
+        broadcast_node.broadcast_request({
+            "op": "logout_session",
+            "args": {"session_id": request.session_id},
+        })
         return seller_pb2.LogoutSellerResponse()
 
+    def TouchSession(self, request, context):
+        broadcast_node.broadcast_request({
+            "op": "touch_session",
+            "args": {"session_id": request.session_id},
+        })
+        return seller_pb2.TouchSessionResponse()
+
+    # -- reads from customer_db → wait for consistency first -----------------
+
     def ValidateSession(self, request, context):
+        _wait_for_read_consistency()
         user_id = validate_session(request.session_id)
         return seller_pb2.ValidateSessionResponse(
             user_id=user_id if user_id is not None else 0
         )
 
-    def TouchSession(self, request, context):
-        touch_session(request.session_id)
-        return seller_pb2.TouchSessionResponse()
-
     def GetSellerRating(self, request, context):
+        _wait_for_read_consistency()
         row = get_seller_rating(request.seller_id)
         if not row:
             return seller_pb2.GetSellerRatingResponse(thumbs_up=0, thumbs_down=0)
         return seller_pb2.GetSellerRatingResponse(
             thumbs_up=row["thumbs_up"],
-            thumbs_down=row["thumbs_down"]
+            thumbs_down=row["thumbs_down"],
         )
+
+    # -- product_db operations → direct (Raft scope, not broadcast) ----------
 
     def RegisterItem(self, request, context):
         success, result = register_item_for_sale(
@@ -95,25 +181,43 @@ class SellerServicer(seller_pb2_grpc.SellerServiceServicer):
         return seller_pb2.ChangeItemPriceResponse(success=success, message=message)
 
 
-def create_seller(username, password):
+# ---------------------------------------------------------------------------
+# customer_db write functions — replicated variants (called via apply_fn)
+# ---------------------------------------------------------------------------
+
+def create_seller_replicated(seller_id, username, password):
+    """
+    Insert a seller with a pre-determined seller_id so all replicas produce
+    the same row.  The caller (broadcast originator) pre-generates the ID.
+    """
     if len(username) > 32:
         return None, "Username must be 32 characters or less"
     conn = customer_db.get_connection()
-    cur = conn.cursor()
-    cur.execute(
-        "INSERT INTO sellers (seller_name, password) VALUES (%s, %s)",
-        (username, password),
-    )
-    seller_id = cur.lastrowid
-    conn.commit()
-    cur.close()
-    conn.close()
-    return seller_id, "OK"
+    cur  = conn.cursor()
+    try:
+        cur.execute(
+            "INSERT INTO sellers (seller_id, seller_name, password) VALUES (%s, %s, %s)",
+            (seller_id, username, password),
+        )
+        conn.commit()
+        cur.close()
+        conn.close()
+        return seller_id, "OK"
+    except Exception as e:
+        conn.rollback()
+        cur.close()
+        conn.close()
+        return None, str(e)
 
 
-def login_seller(username, password):
+def login_seller_replicated(username, password, session_id):
+    """
+    Validate credentials and insert the pre-determined session_id so all
+    replicas insert the same session row.
+    Returns session_id on success, None on bad credentials.
+    """
     conn = customer_db.get_connection()
-    cur = conn.cursor(dictionary=True)
+    cur  = conn.cursor(dictionary=True)
     cur.execute(
         "SELECT seller_id FROM sellers WHERE seller_name=%s AND password=%s",
         (username, password),
@@ -123,23 +227,29 @@ def login_seller(username, password):
         cur.close()
         conn.close()
         return None
-    session_id = str(uuid.uuid4())
-    cur.execute(
-        """
-        INSERT INTO sessions (session_id, user_id, user_type)
-        VALUES (%s, %s, 'seller')
-        """,
-        (session_id, row["seller_id"]),
-    )
-    conn.commit()
+    try:
+        cur.execute(
+            "INSERT INTO sessions (session_id, user_id, user_type) "
+            "VALUES (%s, %s, 'seller')",
+            (session_id, row["seller_id"]),
+        )
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        cur.close()
+        conn.close()
+        return None
     cur.close()
     conn.close()
     return session_id
 
 
-def logout_seller(session_id):
+def delete_seller_session_replicated(session_id):
+    """
+    Delete the session row from customer_db (user_type='seller').
+    """
     conn = customer_db.get_connection()
-    cur = conn.cursor()
+    cur  = conn.cursor()
     cur.execute(
         "DELETE FROM sessions WHERE session_id=%s AND user_type='seller'",
         (session_id,),
@@ -149,11 +259,15 @@ def logout_seller(session_id):
     conn.close()
 
 
+# ---------------------------------------------------------------------------
+# customer_db read functions (unchanged — no broadcast needed)
+# ---------------------------------------------------------------------------
+
 def validate_session(session_id):
     if not session_id:
         return None
     conn = customer_db.get_connection()
-    cur = conn.cursor(dictionary=True)
+    cur  = conn.cursor(dictionary=True)
     cur.execute(
         """
         SELECT user_id, UNIX_TIMESTAMP(last_active) AS last_active
@@ -169,16 +283,31 @@ def validate_session(session_id):
     if not row:
         return None
     if time.time() - row["last_active"] > SESSION_TIMEOUT_SECS:
-        logout_seller(session_id)
+        # Expired — delete directly on this replica only (best-effort; will
+        # propagate on the next touch/logout from the client).
+        _delete_seller_session_direct(session_id)
         return None
     return row["user_id"]
 
 
+def _delete_seller_session_direct(session_id):
+    """Local-only session cleanup (used for expiry; not replicated)."""
+    conn = customer_db.get_connection()
+    cur  = conn.cursor()
+    cur.execute(
+        "DELETE FROM sessions WHERE session_id=%s AND user_type='seller'",
+        (session_id,),
+    )
+    conn.commit()
+    cur.close()
+    conn.close()
+
+
 def touch_session(session_id):
     conn = customer_db.get_connection()
-    cur = conn.cursor()
+    cur  = conn.cursor()
     cur.execute(
-        "UPDATE sessions SET last_active=NOW() WHERE session_id=%s AND user_type = 'seller'",
+        "UPDATE sessions SET last_active=NOW() WHERE session_id=%s AND user_type='seller'",
         (session_id,),
     )
     conn.commit()
@@ -188,7 +317,7 @@ def touch_session(session_id):
 
 def get_seller_rating(seller_id):
     conn = customer_db.get_connection()
-    cur = conn.cursor(dictionary=True)
+    cur  = conn.cursor(dictionary=True)
     cur.execute(
         "SELECT thumbs_up, thumbs_down FROM sellers WHERE seller_id=%s",
         (seller_id,),
@@ -198,6 +327,10 @@ def get_seller_rating(seller_id):
     conn.close()
     return row
 
+
+# ---------------------------------------------------------------------------
+# product_db functions (unchanged — not part of customer DB replication)
+# ---------------------------------------------------------------------------
 
 def register_item_for_sale(seller_id, item_name, item_category, condition_type, salePrice, quantity, keywords):
     if len(item_name) > 32:
@@ -294,14 +427,21 @@ def change_item_price(seller_id, item_id, price):
     return True, "UPDATED"
 
 
+# ---------------------------------------------------------------------------
+# Server entrypoint
+# ---------------------------------------------------------------------------
+
 def serve():
     host = SELLER_GRPC_CONFIG["host"]
     port = SELLER_GRPC_CONFIG["port"]
+
+    broadcast_node.start()
+
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
     seller_pb2_grpc.add_SellerServiceServicer_to_server(SellerServicer(), server)
     server.add_insecure_port(f"{host}:{port}")
     server.start()
-    print(f"Server started on {host}:{port}")
+    print(f"Seller gRPC server started on {host}:{port}")
     server.wait_for_termination()
 
 

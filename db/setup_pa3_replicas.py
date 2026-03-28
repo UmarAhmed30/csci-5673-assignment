@@ -5,8 +5,8 @@ Creates the five customer_db replicas (customer_db_0 … customer_db_4) required
 for PA3 atomic broadcast replication.
 
 Each replica gets the same schema as the original customer_db:
-    - buyers   (buyer_id is AUTO_INCREMENT but the broadcast layer inserts explicit IDs)
-    - sellers
+    - buyers   (buyer_id NOT NULL — broadcast layer inserts explicit pre-generated IDs)
+    - sellers  (seller_id NOT NULL — broadcast layer inserts explicit pre-generated IDs)
     - sessions
 
 Reads MySQL credentials from .env (same vars as the rest of the codebase).
@@ -56,12 +56,13 @@ CREATE TABLE IF NOT EXISTS buyers (
 );
 
 CREATE TABLE IF NOT EXISTS sellers (
-    seller_id  INT AUTO_INCREMENT PRIMARY KEY,
+    seller_id   INT         NOT NULL,
     seller_name VARCHAR(32) NOT NULL,
     password    VARCHAR(64) NOT NULL,
     thumbs_up   INT DEFAULT 0,
     thumbs_down INT DEFAULT 0,
-    items_sold  INT DEFAULT 0
+    items_sold  INT DEFAULT 0,
+    PRIMARY KEY (seller_id)
 );
 
 CREATE TABLE IF NOT EXISTS sessions (
@@ -75,11 +76,11 @@ CREATE TABLE IF NOT EXISTS sessions (
 
 # Stub data identical to the original schema.sql so the existing test clients work.
 SEED_SQL = """
-INSERT IGNORE INTO sellers (seller_name, password, thumbs_up, thumbs_down, items_sold)
+INSERT IGNORE INTO sellers (seller_id, seller_name, password, thumbs_up, thumbs_down, items_sold)
 VALUES
-    ('Seller1', 'seller1', 10, 1, 5),
-    ('Seller2', 'seller2',  3, 0, 2),
-    ('Seller3', 'seller3',  0, 0, 0);
+    (1, 'Seller1', 'seller1', 10, 1, 5),
+    (2, 'Seller2', 'seller2',  3, 0, 2),
+    (3, 'Seller3', 'seller3',  0, 0, 0);
 """
 
 # ---------------------------------------------------------------------------
