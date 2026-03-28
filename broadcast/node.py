@@ -26,6 +26,7 @@ import socket
 import threading
 import time
 from concurrent.futures import Future
+from pathlib import Path
 from typing import Callable, Optional
 
 from broadcast.messages import (
@@ -631,7 +632,10 @@ class BroadcastNode:
                 "op":  payload.get("op"),
                 "ts":  time.time(),
             }
-            with open(f"operation_log_node{self.node_id}.jsonl", "a") as fh:
+            log_dir = Path("logs")
+            log_dir.mkdir(exist_ok=True)
+            log_path = log_dir / f"operation_log_node{self.node_id}.jsonl"
+            with open(log_path, "a") as fh:
                 fh.write(json.dumps(entry) + "\n")
         except Exception as exc:
             logger.warning("[Node %d] op log write failed: %s", self.node_id, exc)
