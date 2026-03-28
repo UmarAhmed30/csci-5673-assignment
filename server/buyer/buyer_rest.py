@@ -17,7 +17,7 @@ from typing import Literal
 import mysql.connector
 from zeep import Client as SoapClient
 
-from server.buyer.config import BUYER_SERVER_CONFIG, BUYER_GRPC_CONFIG, BUYER_GRPC_REPLICAS
+from server.buyer.config import BUYER_SERVER_CONFIG, BUYER_GRPC_CONFIG, BUYER_GRPC_REPLICAS, FINANCIAL_SOAP_URL
 
 logging.basicConfig(
     level=logging.INFO,
@@ -624,7 +624,7 @@ async def make_purchase(
             raise HTTPException(status_code=400, detail=error_msg)
 
         try:
-            soap_client = SoapClient('http://localhost:8002/?wsdl')
+            soap_client = SoapClient(FINANCIAL_SOAP_URL)
             result = soap_client.service.process_transaction(
                 card_holder_name=request.card_holder_name,
                 card_number=request.card_number,

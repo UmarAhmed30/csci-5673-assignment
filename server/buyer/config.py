@@ -15,6 +15,11 @@ BUYER_GRPC_CONFIG = {
     "port": int(os.getenv("BUYER_GRPC_PORT", "50052")),
 }
 
+FINANCIAL_SOAP_URL = (
+    f"http://{os.getenv('FINANCIAL_SERVICE_HOST', 'localhost')}"
+    f":{os.getenv('FINANCIAL_SERVICE_PORT', '8002')}/?wsdl"
+)
+
 # All 5 customer-DB replica gRPC addresses.
 # The REST server tries each in round-robin order on failure.
 # Defaults keep localhost behaviour so existing .env files still work.
