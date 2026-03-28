@@ -9,8 +9,21 @@ BUYER_SERVER_CONFIG = {
     "session_timeout_secs": int(os.getenv("SESSION_TIMEOUT_SECS"))
 }
 
-# gRPC connection config (for REST server to connect to gRPC server)
+# Single gRPC endpoint (legacy / single-replica mode).
 BUYER_GRPC_CONFIG = {
     "host": os.getenv("BUYER_GRPC_HOST", "localhost"),
     "port": int(os.getenv("BUYER_GRPC_PORT", "50052")),
 }
+
+# All 5 customer-DB replica gRPC addresses.
+# The REST server tries each in round-robin order on failure.
+# Defaults keep localhost behaviour so existing .env files still work.
+BUYER_GRPC_REPLICAS = [
+    {
+        "host": os.getenv(f"BUYER_GRPC_REPLICA_{i}_HOST",
+                          os.getenv("BUYER_GRPC_HOST", "localhost")),
+        "port": int(os.getenv(f"BUYER_GRPC_REPLICA_{i}_PORT",
+                              os.getenv("BUYER_GRPC_PORT", "50052"))),
+    }
+    for i in range(5)
+]

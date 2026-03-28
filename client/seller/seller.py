@@ -1,26 +1,48 @@
+import os
 import sys
 from pathlib import Path
 import requests
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
+from dotenv import load_dotenv
+load_dotenv()
+
 from server.seller.config import SELLER_SERVER_CONFIG
 
 SERVER_HOST = SELLER_SERVER_CONFIG["host"]
 SERVER_PORT = SELLER_SERVER_CONFIG["port"]
 
+# List of all 4 seller REST frontend replicas.
+_SELLER_REST_REPLICAS = [
+    {
+        "host": os.getenv(f"SELLER_REST_REPLICA_{i}_HOST", SERVER_HOST),
+        "port": int(os.getenv(f"SELLER_REST_REPLICA_{i}_PORT", SERVER_PORT)),
+    }
+    for i in range(4)
+]
+
 
 class SellerClient:
-    def __init__(self, host=SERVER_HOST, port=SERVER_PORT):
-        self.host = host
-        self.port = port
-        self.session = None
+    def __init__(self, replicas=None):
+        self._replicas    = replicas or _SELLER_REST_REPLICAS
+        self._replica_idx = 0
+        self.session      = None
         self.session_token = None
-        self.base_url = f"http://{host}:{port}"
+        self._update_base_url()
+
+    def _update_base_url(self):
+        r = self._replicas[self._replica_idx]
+        self.base_url = f"http://{r['host']}:{r['port']}"
+
+    def _next_replica(self):
+        self._replica_idx = (self._replica_idx + 1) % len(self._replicas)
+        self._update_base_url()
+        print(f"[SELLER][CLIENT] Switched to replica {self._replica_idx}: {self.base_url}")
 
     def connect(self):
         self.session = requests.Session()
-        print("[SELLER][CLIENT] Connected to seller server")
+        print(f"[SELLER][CLIENT] Connected to seller server at {self.base_url}")
 
     def close(self):
         if self.session:
@@ -28,55 +50,58 @@ class SellerClient:
             self.session = None
 
     def send(self, method, endpoint, json_data=None):
-        url = f"{self.base_url}{endpoint}"
-        headers = {}
-
-        # Include session token in Authorization header if authenticated
-        if self.session_token:
-            headers["Authorization"] = f"Bearer {self.session_token}"
-
-        try:
-            if method == "GET":
-                response = self.session.get(url, headers=headers, params=json_data)
-            elif method == "POST":
-                response = self.session.post(url, headers=headers, json=json_data)
-            elif method == "PUT":
-                response = self.session.put(url, headers=headers, json=json_data)
-            elif method == "DELETE":
-                response = self.session.delete(url, headers=headers, json=json_data)
-            else:
-                return {"status": "error", "message": f"Unsupported HTTP method: {method}"}
+        for attempt in range(len(self._replicas)):
+            url = f"{self.base_url}{endpoint}"
+            headers = {}
+            if self.session_token:
+                headers["Authorization"] = f"Bearer {self.session_token}"
 
             try:
-                data = response.json()
-            except:
-                data = {"message": response.text}
+                if method == "GET":
+                    response = self.session.get(url, headers=headers, params=json_data)
+                elif method == "POST":
+                    response = self.session.post(url, headers=headers, json=json_data)
+                elif method == "PUT":
+                    response = self.session.put(url, headers=headers, json=json_data)
+                elif method == "DELETE":
+                    response = self.session.delete(url, headers=headers, json=json_data)
+                else:
+                    return {"status": "error", "message": f"Unsupported HTTP method: {method}"}
 
-            if response.status_code in [200, 201]:
-                return {"status": "ok", "data": data}
-            elif response.status_code == 400:
-                return {"status": "error", "message": data.get("detail", "Bad request")}
-            elif response.status_code == 401:
-                return {"status": "error", "message": data.get("detail", "Unauthorized")}
-            elif response.status_code == 403:
-                return {"status": "error", "message": data.get("detail", "Forbidden")}
-            elif response.status_code == 404:
-                return {"status": "error", "message": data.get("detail", "Not found")}
-            elif response.status_code == 409:
-                return {"status": "error", "message": data.get("detail", "Conflict")}
-            elif response.status_code == 422:
-                return {"status": "error", "message": data.get("detail", "Validation error")}
-            elif response.status_code >= 500:
-                return {"status": "error", "message": data.get("detail", "Server error")}
-            else:
-                return {"status": "error", "message": f"Unexpected status code: {response.status_code}"}
+                try:
+                    data = response.json()
+                except Exception:
+                    data = {"message": response.text}
 
-        except requests.exceptions.ConnectionError:
-            return {"status": "error", "message": "Failed to connect to server"}
-        except requests.exceptions.Timeout:
-            return {"status": "error", "message": "Request timeout"}
-        except Exception as e:
-            return {"status": "error", "message": f"Request failed: {str(e)}"}
+                if response.status_code in [200, 201]:
+                    return {"status": "ok", "data": data}
+                elif response.status_code == 400:
+                    return {"status": "error", "message": data.get("detail", "Bad request")}
+                elif response.status_code == 401:
+                    return {"status": "error", "message": data.get("detail", "Unauthorized")}
+                elif response.status_code == 403:
+                    return {"status": "error", "message": data.get("detail", "Forbidden")}
+                elif response.status_code == 404:
+                    return {"status": "error", "message": data.get("detail", "Not found")}
+                elif response.status_code == 409:
+                    return {"status": "error", "message": data.get("detail", "Conflict")}
+                elif response.status_code == 422:
+                    return {"status": "error", "message": data.get("detail", "Validation error")}
+                elif response.status_code >= 500:
+                    return {"status": "error", "message": data.get("detail", "Server error")}
+                else:
+                    return {"status": "error", "message": f"Unexpected status code: {response.status_code}"}
+
+            except requests.exceptions.ConnectionError:
+                if attempt < len(self._replicas) - 1:
+                    print(f"[SELLER][CLIENT] Replica {self._replica_idx} unreachable, failing over...")
+                    self._next_replica()
+                else:
+                    return {"status": "error", "message": "All seller server replicas unreachable"}
+            except requests.exceptions.Timeout:
+                return {"status": "error", "message": "Request timeout"}
+            except Exception as e:
+                return {"status": "error", "message": f"Request failed: {str(e)}"}
 
     def repl(self):
         print("\nSeller CLI")

@@ -17,7 +17,7 @@ from typing import Literal
 import mysql.connector
 from zeep import Client as SoapClient
 
-from server.buyer.config import BUYER_SERVER_CONFIG, BUYER_GRPC_CONFIG
+from server.buyer.config import BUYER_SERVER_CONFIG, BUYER_GRPC_CONFIG, BUYER_GRPC_REPLICAS
 
 logging.basicConfig(
     level=logging.INFO,
@@ -25,10 +25,48 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# gRPC channel and stub
-grpc_address = f"{BUYER_GRPC_CONFIG['host']}:{BUYER_GRPC_CONFIG['port']}"
-channel = grpc.insecure_channel(grpc_address)
-stub = buyer_pb2_grpc.BuyerServiceStub(channel)
+
+class ResilientStub:
+    """
+    Round-robin stub over all 5 customer-DB gRPC replicas.
+    On any gRPC UNAVAILABLE / transient error, retries the next replica in the
+    list up to len(replicas) times before propagating the exception.
+    """
+
+    def __init__(self, replicas):
+        self._addrs = [f"{r['host']}:{r['port']}" for r in replicas]
+        self._idx   = 0
+        self._stubs = [
+            buyer_pb2_grpc.BuyerServiceStub(grpc.insecure_channel(addr))
+            for addr in self._addrs
+        ]
+
+    def _call(self, method_name: str, request):
+        last_exc = None
+        for _ in range(len(self._stubs)):
+            stub = self._stubs[self._idx]
+            try:
+                return getattr(stub, method_name)(request)
+            except grpc.RpcError as exc:
+                if exc.code() in (
+                    grpc.StatusCode.UNAVAILABLE,
+                    grpc.StatusCode.DEADLINE_EXCEEDED,
+                ):
+                    logger.warning(
+                        "gRPC replica %s unavailable (%s), trying next",
+                        self._addrs[self._idx], exc.code(),
+                    )
+                    self._idx = (self._idx + 1) % len(self._stubs)
+                    last_exc = exc
+                else:
+                    raise
+        raise last_exc  # all replicas failed
+
+    def __getattr__(self, name):
+        return lambda req: self._call(name, req)
+
+
+stub = ResilientStub(BUYER_GRPC_REPLICAS)
 
 app = FastAPI(
     title="Buyer Server APIs",

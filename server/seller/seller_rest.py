@@ -13,7 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import mysql.connector
 
-from server.seller.config import SELLER_SERVER_CONFIG, SELLER_GRPC_CONFIG
+from server.seller.config import SELLER_SERVER_CONFIG, SELLER_GRPC_CONFIG, SELLER_GRPC_REPLICAS
 
 logging.basicConfig(
     level=logging.INFO,
@@ -21,10 +21,47 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# gRPC channel and stub
-grpc_address = f"{SELLER_GRPC_CONFIG['host']}:{SELLER_GRPC_CONFIG['port']}"
-channel = grpc.insecure_channel(grpc_address)
-stub = seller_pb2_grpc.SellerServiceStub(channel)
+
+class ResilientStub:
+    """
+    Round-robin stub over all 5 product-DB gRPC replicas.
+    On UNAVAILABLE / DEADLINE_EXCEEDED, retries the next replica.
+    """
+
+    def __init__(self, replicas):
+        self._addrs = [f"{r['host']}:{r['port']}" for r in replicas]
+        self._idx   = 0
+        self._stubs = [
+            seller_pb2_grpc.SellerServiceStub(grpc.insecure_channel(addr))
+            for addr in self._addrs
+        ]
+
+    def _call(self, method_name: str, request):
+        last_exc = None
+        for _ in range(len(self._stubs)):
+            stub = self._stubs[self._idx]
+            try:
+                return getattr(stub, method_name)(request)
+            except grpc.RpcError as exc:
+                if exc.code() in (
+                    grpc.StatusCode.UNAVAILABLE,
+                    grpc.StatusCode.DEADLINE_EXCEEDED,
+                ):
+                    logger.warning(
+                        "gRPC replica %s unavailable (%s), trying next",
+                        self._addrs[self._idx], exc.code(),
+                    )
+                    self._idx = (self._idx + 1) % len(self._stubs)
+                    last_exc = exc
+                else:
+                    raise
+        raise last_exc
+
+    def __getattr__(self, name):
+        return lambda req: self._call(name, req)
+
+
+stub = ResilientStub(SELLER_GRPC_REPLICAS)
 
 app = FastAPI(
     title="Seller Server APIs",
