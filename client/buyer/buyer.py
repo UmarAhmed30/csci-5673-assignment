@@ -14,14 +14,14 @@ from server.buyer.config import BUYER_SERVER_CONFIG
 SERVER_HOST = BUYER_SERVER_CONFIG["host"]
 SERVER_PORT = BUYER_SERVER_CONFIG["port"]
 
-# List of all 4 buyer REST frontend replicas.
+# List of all buyer REST frontend replicas (default 5; set BUYER_REST_REPLICA_<n>_HOST/PORT).
 # Defaults to the single configured host/port so existing .env files still work.
 _BUYER_REST_REPLICAS = [
     {
         "host": os.getenv(f"BUYER_REST_REPLICA_{i}_HOST", SERVER_HOST),
         "port": int(os.getenv(f"BUYER_REST_REPLICA_{i}_PORT", SERVER_PORT)),
     }
-    for i in range(4)
+    for i in range(5)
 ]
 
 

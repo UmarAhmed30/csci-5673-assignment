@@ -1,0 +1,17 @@
+# Modular PA3 stack (Compose v2.20+ `include`).
+# Layers: DB (+ db-init) → gRPC (product / seller / buyer) → financial SOAP → REST (5× seller + 5× buyer).
+#
+# Local (all-in-one):
+#   cp docker/.env.example docker/.env
+#   docker compose build
+#   docker compose up -d
+#
+# Layers separately: see docker/README.md and scripts/run-*.sh
+
+name: csci5673-pa3
+
+include:
+  - path: docker/compose/db.yml
+  - path: docker/compose/grpc.yml
+  - path: docker/compose/financial.yml
+  - path: docker/compose/rest.yml

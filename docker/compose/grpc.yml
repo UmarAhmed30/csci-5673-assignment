@@ -1,0 +1,251 @@
+# gRPC data layers: product (Raft), seller (broadcast), buyer (broadcast).
+# DB: set DB_HOST to the MySQL VM IP (or `mysql` if you merge with docker/compose/db.yml on the same network).
+# Peers: defaults use Compose DNS names; override RAFT_NODE_*_HOST / BROADCAST_NODE_*_HOST / *_GRPC_REPLICA_* for multi-VM (often same IP, fixed ports).
+#
+# Typical:  docker compose -f docker/compose/db.yml -f docker/compose/grpc.yml --env-file docker/.env up -d
+# Remote DB only:  DB_HOST=203.0.113.10 docker compose -f docker/compose/grpc.yml --env-file docker/.env up -d
+
+x-db-env: &db-env
+  CUSTOMER_DB_HOST: ${DB_HOST:-mysql}
+  CUSTOMER_DB_PORT: ${DB_PORT:-3306}
+  CUSTOMER_DB_USER: umar
+  CUSTOMER_DB_PASSWORD: ${DB_PASSWORD:-dockerdb}
+  PRODUCT_DB_HOST: ${DB_HOST:-mysql}
+  PRODUCT_DB_PORT: ${DB_PORT:-3306}
+  PRODUCT_DB_USER: umar
+  PRODUCT_DB_PASSWORD: ${DB_PASSWORD:-dockerdb}
+
+services:
+  product-grpc-0: &product-grpc
+    build:
+      context: ../..
+      dockerfile: docker/Dockerfile
+    environment: &product-env-0
+      <<: *db-env
+      PRODUCT_DB_NAME: product_db_0
+      PRODUCT_NODE_ID: 0
+      RAFT_NODE_0_HOST: ${RAFT_NODE_0_HOST:-product-grpc-0}
+      RAFT_NODE_0_PORT: ${RAFT_NODE_0_PORT:-7100}
+      RAFT_NODE_1_HOST: ${RAFT_NODE_1_HOST:-product-grpc-1}
+      RAFT_NODE_1_PORT: ${RAFT_NODE_1_PORT:-7101}
+      RAFT_NODE_2_HOST: ${RAFT_NODE_2_HOST:-product-grpc-2}
+      RAFT_NODE_2_PORT: ${RAFT_NODE_2_PORT:-7102}
+      RAFT_NODE_3_HOST: ${RAFT_NODE_3_HOST:-product-grpc-3}
+      RAFT_NODE_3_PORT: ${RAFT_NODE_3_PORT:-7103}
+      RAFT_NODE_4_HOST: ${RAFT_NODE_4_HOST:-product-grpc-4}
+      RAFT_NODE_4_PORT: ${RAFT_NODE_4_PORT:-7104}
+      PRODUCT_GRPC_BIND_HOST: 0.0.0.0
+      PRODUCT_GRPC_PORT: ${PRODUCT_GRPC_PORT_0:-50070}
+    command: ["python", "db_layer/product/product_server.py"]
+    ports:
+      - "${PRODUCT_GRPC_PORT_0:-50070}:${PRODUCT_GRPC_PORT_0:-50070}"
+      - "${RAFT_NODE_0_PORT:-7100}:${RAFT_NODE_0_PORT:-7100}/tcp"
+    restart: unless-stopped
+
+  product-grpc-1:
+    <<: *product-grpc
+    environment:
+      <<: *product-env-0
+      PRODUCT_DB_NAME: product_db_1
+      PRODUCT_NODE_ID: 1
+      PRODUCT_GRPC_PORT: ${PRODUCT_GRPC_PORT_1:-50071}
+    ports:
+      - "${PRODUCT_GRPC_PORT_1:-50071}:${PRODUCT_GRPC_PORT_1:-50071}"
+      - "${RAFT_NODE_1_PORT:-7101}:${RAFT_NODE_1_PORT:-7101}/tcp"
+
+  product-grpc-2:
+    <<: *product-grpc
+    environment:
+      <<: *product-env-0
+      PRODUCT_DB_NAME: product_db_2
+      PRODUCT_NODE_ID: 2
+      PRODUCT_GRPC_PORT: ${PRODUCT_GRPC_PORT_2:-50072}
+    ports:
+      - "${PRODUCT_GRPC_PORT_2:-50072}:${PRODUCT_GRPC_PORT_2:-50072}"
+      - "${RAFT_NODE_2_PORT:-7102}:${RAFT_NODE_2_PORT:-7102}/tcp"
+
+  product-grpc-3:
+    <<: *product-grpc
+    environment:
+      <<: *product-env-0
+      PRODUCT_DB_NAME: product_db_3
+      PRODUCT_NODE_ID: 3
+      PRODUCT_GRPC_PORT: ${PRODUCT_GRPC_PORT_3:-50073}
+    ports:
+      - "${PRODUCT_GRPC_PORT_3:-50073}:${PRODUCT_GRPC_PORT_3:-50073}"
+      - "${RAFT_NODE_3_PORT:-7103}:${RAFT_NODE_3_PORT:-7103}/tcp"
+
+  product-grpc-4:
+    <<: *product-grpc
+    environment:
+      <<: *product-env-0
+      PRODUCT_DB_NAME: product_db_4
+      PRODUCT_NODE_ID: 4
+      PRODUCT_GRPC_PORT: ${PRODUCT_GRPC_PORT_4:-50074}
+    ports:
+      - "${PRODUCT_GRPC_PORT_4:-50074}:${PRODUCT_GRPC_PORT_4:-50074}"
+      - "${RAFT_NODE_4_PORT:-7104}:${RAFT_NODE_4_PORT:-7104}/tcp"
+
+  seller-grpc-0: &seller-grpc
+    build:
+      context: ../..
+      dockerfile: docker/Dockerfile
+    environment: &seller-env-0
+      <<: *db-env
+      CUSTOMER_DB_NAME: customer_db_0
+      PRODUCT_DB_NAME: product_db
+      MY_NODE_ID: 0
+      BROADCAST_NODE_0_HOST: ${SELLER_BC_0_HOST:-seller-grpc-0}
+      BROADCAST_NODE_0_PORT: ${SELLER_BC_0_PORT:-6200}
+      BROADCAST_NODE_1_HOST: ${SELLER_BC_1_HOST:-seller-grpc-1}
+      BROADCAST_NODE_1_PORT: ${SELLER_BC_1_PORT:-6201}
+      BROADCAST_NODE_2_HOST: ${SELLER_BC_2_HOST:-seller-grpc-2}
+      BROADCAST_NODE_2_PORT: ${SELLER_BC_2_PORT:-6202}
+      BROADCAST_NODE_3_HOST: ${SELLER_BC_3_HOST:-seller-grpc-3}
+      BROADCAST_NODE_3_PORT: ${SELLER_BC_3_PORT:-6203}
+      BROADCAST_NODE_4_HOST: ${SELLER_BC_4_HOST:-seller-grpc-4}
+      BROADCAST_NODE_4_PORT: ${SELLER_BC_4_PORT:-6204}
+      SELLER_GRPC_BIND_HOST: 0.0.0.0
+      SELLER_GRPC_PORT: ${SELLER_GRPC_PORT_0:-50061}
+      SESSION_TIMEOUT_SECS: ${SESSION_TIMEOUT_SECS:-300}
+      PRODUCT_GRPC_REPLICA_0_HOST: ${PRODUCT_GRPC_REPLICA_0_HOST:-product-grpc-0}
+      PRODUCT_GRPC_REPLICA_0_PORT: ${PRODUCT_GRPC_REPLICA_0_PORT:-50070}
+      PRODUCT_GRPC_REPLICA_1_HOST: ${PRODUCT_GRPC_REPLICA_1_HOST:-product-grpc-1}
+      PRODUCT_GRPC_REPLICA_1_PORT: ${PRODUCT_GRPC_REPLICA_1_PORT:-50071}
+      PRODUCT_GRPC_REPLICA_2_HOST: ${PRODUCT_GRPC_REPLICA_2_HOST:-product-grpc-2}
+      PRODUCT_GRPC_REPLICA_2_PORT: ${PRODUCT_GRPC_REPLICA_2_PORT:-50072}
+      PRODUCT_GRPC_REPLICA_3_HOST: ${PRODUCT_GRPC_REPLICA_3_HOST:-product-grpc-3}
+      PRODUCT_GRPC_REPLICA_3_PORT: ${PRODUCT_GRPC_REPLICA_3_PORT:-50073}
+      PRODUCT_GRPC_REPLICA_4_HOST: ${PRODUCT_GRPC_REPLICA_4_HOST:-product-grpc-4}
+      PRODUCT_GRPC_REPLICA_4_PORT: ${PRODUCT_GRPC_REPLICA_4_PORT:-50074}
+    command: ["python", "db_layer/seller/seller.py"]
+    ports:
+      - "${SELLER_GRPC_PORT_0:-50061}:${SELLER_GRPC_PORT_0:-50061}"
+      - "${SELLER_BC_0_PORT:-6200}:${SELLER_BC_0_PORT:-6200}/udp"
+    restart: unless-stopped
+
+  seller-grpc-1:
+    <<: *seller-grpc
+    environment:
+      <<: *seller-env-0
+      CUSTOMER_DB_NAME: customer_db_1
+      MY_NODE_ID: 1
+      SELLER_GRPC_PORT: ${SELLER_GRPC_PORT_1:-50062}
+    ports:
+      - "${SELLER_GRPC_PORT_1:-50062}:${SELLER_GRPC_PORT_1:-50062}"
+      - "${SELLER_BC_1_PORT:-6201}:${SELLER_BC_1_PORT:-6201}/udp"
+
+  seller-grpc-2:
+    <<: *seller-grpc
+    environment:
+      <<: *seller-env-0
+      CUSTOMER_DB_NAME: customer_db_2
+      MY_NODE_ID: 2
+      SELLER_GRPC_PORT: ${SELLER_GRPC_PORT_2:-50063}
+    ports:
+      - "${SELLER_GRPC_PORT_2:-50063}:${SELLER_GRPC_PORT_2:-50063}"
+      - "${SELLER_BC_2_PORT:-6202}:${SELLER_BC_2_PORT:-6202}/udp"
+
+  seller-grpc-3:
+    <<: *seller-grpc
+    environment:
+      <<: *seller-env-0
+      CUSTOMER_DB_NAME: customer_db_3
+      MY_NODE_ID: 3
+      SELLER_GRPC_PORT: ${SELLER_GRPC_PORT_3:-50064}
+    ports:
+      - "${SELLER_GRPC_PORT_3:-50064}:${SELLER_GRPC_PORT_3:-50064}"
+      - "${SELLER_BC_3_PORT:-6203}:${SELLER_BC_3_PORT:-6203}/udp"
+
+  seller-grpc-4:
+    <<: *seller-grpc
+    environment:
+      <<: *seller-env-0
+      CUSTOMER_DB_NAME: customer_db_4
+      MY_NODE_ID: 4
+      SELLER_GRPC_PORT: ${SELLER_GRPC_PORT_4:-50065}
+    ports:
+      - "${SELLER_GRPC_PORT_4:-50065}:${SELLER_GRPC_PORT_4:-50065}"
+      - "${SELLER_BC_4_PORT:-6204}:${SELLER_BC_4_PORT:-6204}/udp"
+
+  buyer-grpc-0: &buyer-grpc
+    build:
+      context: ../..
+      dockerfile: docker/Dockerfile
+    environment: &buyer-env-0
+      <<: *db-env
+      CUSTOMER_DB_NAME: customer_db_0
+      PRODUCT_DB_NAME: product_db
+      MY_NODE_ID: 0
+      BROADCAST_NODE_0_HOST: ${BUYER_BC_0_HOST:-buyer-grpc-0}
+      BROADCAST_NODE_0_PORT: ${BUYER_BC_0_PORT:-6100}
+      BROADCAST_NODE_1_HOST: ${BUYER_BC_1_HOST:-buyer-grpc-1}
+      BROADCAST_NODE_1_PORT: ${BUYER_BC_1_PORT:-6101}
+      BROADCAST_NODE_2_HOST: ${BUYER_BC_2_HOST:-buyer-grpc-2}
+      BROADCAST_NODE_2_PORT: ${BUYER_BC_2_PORT:-6102}
+      BROADCAST_NODE_3_HOST: ${BUYER_BC_3_HOST:-buyer-grpc-3}
+      BROADCAST_NODE_3_PORT: ${BUYER_BC_3_PORT:-6103}
+      BROADCAST_NODE_4_HOST: ${BUYER_BC_4_HOST:-buyer-grpc-4}
+      BROADCAST_NODE_4_PORT: ${BUYER_BC_4_PORT:-6104}
+      BUYER_GRPC_BIND_HOST: 0.0.0.0
+      BUYER_GRPC_PORT: ${BUYER_GRPC_PORT_0:-50052}
+      SESSION_TIMEOUT_SECS: ${SESSION_TIMEOUT_SECS:-300}
+      PRODUCT_GRPC_REPLICA_0_HOST: ${PRODUCT_GRPC_REPLICA_0_HOST:-product-grpc-0}
+      PRODUCT_GRPC_REPLICA_0_PORT: ${PRODUCT_GRPC_REPLICA_0_PORT:-50070}
+      PRODUCT_GRPC_REPLICA_1_HOST: ${PRODUCT_GRPC_REPLICA_1_HOST:-product-grpc-1}
+      PRODUCT_GRPC_REPLICA_1_PORT: ${PRODUCT_GRPC_REPLICA_1_PORT:-50071}
+      PRODUCT_GRPC_REPLICA_2_HOST: ${PRODUCT_GRPC_REPLICA_2_HOST:-product-grpc-2}
+      PRODUCT_GRPC_REPLICA_2_PORT: ${PRODUCT_GRPC_REPLICA_2_PORT:-50072}
+      PRODUCT_GRPC_REPLICA_3_HOST: ${PRODUCT_GRPC_REPLICA_3_HOST:-product-grpc-3}
+      PRODUCT_GRPC_REPLICA_3_PORT: ${PRODUCT_GRPC_REPLICA_3_PORT:-50073}
+      PRODUCT_GRPC_REPLICA_4_HOST: ${PRODUCT_GRPC_REPLICA_4_HOST:-product-grpc-4}
+      PRODUCT_GRPC_REPLICA_4_PORT: ${PRODUCT_GRPC_REPLICA_4_PORT:-50074}
+    command: ["python", "db_layer/buyer/buyer.py"]
+    ports:
+      - "${BUYER_GRPC_PORT_0:-50052}:${BUYER_GRPC_PORT_0:-50052}"
+      - "${BUYER_BC_0_PORT:-6100}:${BUYER_BC_0_PORT:-6100}/udp"
+    restart: unless-stopped
+
+  buyer-grpc-1:
+    <<: *buyer-grpc
+    environment:
+      <<: *buyer-env-0
+      CUSTOMER_DB_NAME: customer_db_1
+      MY_NODE_ID: 1
+      BUYER_GRPC_PORT: ${BUYER_GRPC_PORT_1:-50053}
+    ports:
+      - "${BUYER_GRPC_PORT_1:-50053}:${BUYER_GRPC_PORT_1:-50053}"
+      - "${BUYER_BC_1_PORT:-6101}:${BUYER_BC_1_PORT:-6101}/udp"
+
+  buyer-grpc-2:
+    <<: *buyer-grpc
+    environment:
+      <<: *buyer-env-0
+      CUSTOMER_DB_NAME: customer_db_2
+      MY_NODE_ID: 2
+      BUYER_GRPC_PORT: ${BUYER_GRPC_PORT_2:-50054}
+    ports:
+      - "${BUYER_GRPC_PORT_2:-50054}:${BUYER_GRPC_PORT_2:-50054}"
+      - "${BUYER_BC_2_PORT:-6102}:${BUYER_BC_2_PORT:-6102}/udp"
+
+  buyer-grpc-3:
+    <<: *buyer-grpc
+    environment:
+      <<: *buyer-env-0
+      CUSTOMER_DB_NAME: customer_db_3
+      MY_NODE_ID: 3
+      BUYER_GRPC_PORT: ${BUYER_GRPC_PORT_3:-50055}
+    ports:
+      - "${BUYER_GRPC_PORT_3:-50055}:${BUYER_GRPC_PORT_3:-50055}"
+      - "${BUYER_BC_3_PORT:-6103}:${BUYER_BC_3_PORT:-6103}/udp"
+
+  buyer-grpc-4:
+    <<: *buyer-grpc
+    environment:
+      <<: *buyer-env-0
+      CUSTOMER_DB_NAME: customer_db_4
+      MY_NODE_ID: 4
+      BUYER_GRPC_PORT: ${BUYER_GRPC_PORT_4:-50056}
+    ports:
+      - "${BUYER_GRPC_PORT_4:-50056}:${BUYER_GRPC_PORT_4:-50056}"
+      - "${BUYER_BC_4_PORT:-6104}:${BUYER_BC_4_PORT:-6104}/udp"

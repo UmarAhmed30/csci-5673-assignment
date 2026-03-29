@@ -1,0 +1,11 @@
+# SOAP financial service (card approval). Can run on any host; REST uses FINANCIAL_SERVICE_HOST.
+# Run: docker compose -f docker/compose/financial.yml --env-file docker/.env up -d
+
+services:
+  financial:
+    build:
+      context: ../..
+      dockerfile: docker/Dockerfile
+    command: ["python", "server/financial/financial_soap.py"]
+    ports:
+      - "${FINANCIAL_PORT:-8002}:8002"

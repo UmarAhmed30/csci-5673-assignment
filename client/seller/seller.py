@@ -13,13 +13,13 @@ from server.seller.config import SELLER_SERVER_CONFIG
 SERVER_HOST = SELLER_SERVER_CONFIG["host"]
 SERVER_PORT = SELLER_SERVER_CONFIG["port"]
 
-# List of all 4 seller REST frontend replicas.
+# List of all seller REST frontend replicas (default 5; set SELLER_REST_REPLICA_<n>_HOST/PORT).
 _SELLER_REST_REPLICAS = [
     {
         "host": os.getenv(f"SELLER_REST_REPLICA_{i}_HOST", SERVER_HOST),
         "port": int(os.getenv(f"SELLER_REST_REPLICA_{i}_PORT", SERVER_PORT)),
     }
-    for i in range(4)
+    for i in range(5)
 ]
 
 

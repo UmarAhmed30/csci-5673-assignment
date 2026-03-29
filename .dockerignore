@@ -1,0 +1,13 @@
+.git
+.gitignore
+venv
+__pycache__
+*.pyc
+.pytest_cache
+.mypy_cache
+*.md
+.env
+env.*.replica.*
+env.*.rest.*
+terminals
+.cursor

@@ -1,0 +1,178 @@
+# HTTP REST frontends: 5 seller + 5 buyer (same gRPC and financial targets via env).
+# Point at gRPC VMs with e.g. SELLER_GRPC_REPLICA_0_HOST=203.0.113.50 (repeat per replica or same IP + default ports).
+# Financial: FINANCIAL_SERVICE_HOST / FINANCIAL_SERVICE_PORT
+#
+# Merge with other stacks on the same Docker network, or set all *_HOST vars to real IPs.
+# Run (after DB + gRPC + optional financial):  
+#   docker compose -f docker/compose/db.yml -f docker/compose/grpc.yml -f docker/compose/financial.yml -f docker/compose/rest.yml --env-file docker/.env up -d
+
+# Use DOCKER_* for compose substitution so root `.env` (meant for host-run Python clients)
+# does not override container-to-container names like seller-grpc-0.
+x-seller-grpc-targets: &seller-grpc-targets
+  SELLER_GRPC_REPLICA_0_HOST: ${DOCKER_SELLER_GRPC_REPLICA_0_HOST:-seller-grpc-0}
+  SELLER_GRPC_REPLICA_0_PORT: ${DOCKER_SELLER_GRPC_REPLICA_0_PORT:-50061}
+  SELLER_GRPC_REPLICA_1_HOST: ${DOCKER_SELLER_GRPC_REPLICA_1_HOST:-seller-grpc-1}
+  SELLER_GRPC_REPLICA_1_PORT: ${DOCKER_SELLER_GRPC_REPLICA_1_PORT:-50062}
+  SELLER_GRPC_REPLICA_2_HOST: ${DOCKER_SELLER_GRPC_REPLICA_2_HOST:-seller-grpc-2}
+  SELLER_GRPC_REPLICA_2_PORT: ${DOCKER_SELLER_GRPC_REPLICA_2_PORT:-50063}
+  SELLER_GRPC_REPLICA_3_HOST: ${DOCKER_SELLER_GRPC_REPLICA_3_HOST:-seller-grpc-3}
+  SELLER_GRPC_REPLICA_3_PORT: ${DOCKER_SELLER_GRPC_REPLICA_3_PORT:-50064}
+  SELLER_GRPC_REPLICA_4_HOST: ${DOCKER_SELLER_GRPC_REPLICA_4_HOST:-seller-grpc-4}
+  SELLER_GRPC_REPLICA_4_PORT: ${DOCKER_SELLER_GRPC_REPLICA_4_PORT:-50065}
+
+x-buyer-grpc-targets: &buyer-grpc-targets
+  BUYER_GRPC_REPLICA_0_HOST: ${DOCKER_BUYER_GRPC_REPLICA_0_HOST:-buyer-grpc-0}
+  BUYER_GRPC_REPLICA_0_PORT: ${DOCKER_BUYER_GRPC_REPLICA_0_PORT:-50052}
+  BUYER_GRPC_REPLICA_1_HOST: ${DOCKER_BUYER_GRPC_REPLICA_1_HOST:-buyer-grpc-1}
+  BUYER_GRPC_REPLICA_1_PORT: ${DOCKER_BUYER_GRPC_REPLICA_1_PORT:-50053}
+  BUYER_GRPC_REPLICA_2_HOST: ${DOCKER_BUYER_GRPC_REPLICA_2_HOST:-buyer-grpc-2}
+  BUYER_GRPC_REPLICA_2_PORT: ${DOCKER_BUYER_GRPC_REPLICA_2_PORT:-50054}
+  BUYER_GRPC_REPLICA_3_HOST: ${DOCKER_BUYER_GRPC_REPLICA_3_HOST:-buyer-grpc-3}
+  BUYER_GRPC_REPLICA_3_PORT: ${DOCKER_BUYER_GRPC_REPLICA_3_PORT:-50055}
+  BUYER_GRPC_REPLICA_4_HOST: ${DOCKER_BUYER_GRPC_REPLICA_4_HOST:-buyer-grpc-4}
+  BUYER_GRPC_REPLICA_4_PORT: ${DOCKER_BUYER_GRPC_REPLICA_4_PORT:-50056}
+
+x-financial: &financial-env
+  FINANCIAL_SERVICE_HOST: ${DOCKER_FINANCIAL_SERVICE_HOST:-financial}
+  FINANCIAL_SERVICE_PORT: ${DOCKER_FINANCIAL_SERVICE_PORT:-8002}
+
+services:
+  seller-rest-0:
+    build:
+      context: ../..
+      dockerfile: docker/Dockerfile
+    environment:
+      SELLER_SERVER_HOST: 0.0.0.0
+      SELLER_SERVER_PORT: 9002
+      SESSION_TIMEOUT_SECS: ${SESSION_TIMEOUT_SECS:-300}
+      <<: [*seller-grpc-targets, *financial-env]
+    command: ["python", "server/seller/seller_rest.py"]
+    ports:
+      - "${SELLER_REST_HOST_PORT_0:-9020}:9002"
+    restart: unless-stopped
+
+  seller-rest-1:
+    build:
+      context: ../..
+      dockerfile: docker/Dockerfile
+    environment:
+      SELLER_SERVER_HOST: 0.0.0.0
+      SELLER_SERVER_PORT: 9002
+      SESSION_TIMEOUT_SECS: ${SESSION_TIMEOUT_SECS:-300}
+      <<: [*seller-grpc-targets, *financial-env]
+    command: ["python", "server/seller/seller_rest.py"]
+    ports:
+      - "${SELLER_REST_HOST_PORT_1:-9021}:9002"
+    restart: unless-stopped
+
+  seller-rest-2:
+    build:
+      context: ../..
+      dockerfile: docker/Dockerfile
+    environment:
+      SELLER_SERVER_HOST: 0.0.0.0
+      SELLER_SERVER_PORT: 9002
+      SESSION_TIMEOUT_SECS: ${SESSION_TIMEOUT_SECS:-300}
+      <<: [*seller-grpc-targets, *financial-env]
+    command: ["python", "server/seller/seller_rest.py"]
+    ports:
+      - "${SELLER_REST_HOST_PORT_2:-9022}:9002"
+    restart: unless-stopped
+
+  seller-rest-3:
+    build:
+      context: ../..
+      dockerfile: docker/Dockerfile
+    environment:
+      SELLER_SERVER_HOST: 0.0.0.0
+      SELLER_SERVER_PORT: 9002
+      SESSION_TIMEOUT_SECS: ${SESSION_TIMEOUT_SECS:-300}
+      <<: [*seller-grpc-targets, *financial-env]
+    command: ["python", "server/seller/seller_rest.py"]
+    ports:
+      - "${SELLER_REST_HOST_PORT_3:-9023}:9002"
+    restart: unless-stopped
+
+  seller-rest-4:
+    build:
+      context: ../..
+      dockerfile: docker/Dockerfile
+    environment:
+      SELLER_SERVER_HOST: 0.0.0.0
+      SELLER_SERVER_PORT: 9002
+      SESSION_TIMEOUT_SECS: ${SESSION_TIMEOUT_SECS:-300}
+      <<: [*seller-grpc-targets, *financial-env]
+    command: ["python", "server/seller/seller_rest.py"]
+    ports:
+      - "${SELLER_REST_HOST_PORT_4:-9024}:9002"
+    restart: unless-stopped
+
+  buyer-rest-0:
+    build:
+      context: ../..
+      dockerfile: docker/Dockerfile
+    environment:
+      BUYER_SERVER_HOST: 0.0.0.0
+      BUYER_SERVER_PORT: 9001
+      SESSION_TIMEOUT_SECS: ${SESSION_TIMEOUT_SECS:-300}
+      <<: [*buyer-grpc-targets, *financial-env]
+    command: ["python", "server/buyer/buyer_rest.py"]
+    ports:
+      - "${BUYER_REST_HOST_PORT_0:-9120}:9001"
+    restart: unless-stopped
+
+  buyer-rest-1:
+    build:
+      context: ../..
+      dockerfile: docker/Dockerfile
+    environment:
+      BUYER_SERVER_HOST: 0.0.0.0
+      BUYER_SERVER_PORT: 9001
+      SESSION_TIMEOUT_SECS: ${SESSION_TIMEOUT_SECS:-300}
+      <<: [*buyer-grpc-targets, *financial-env]
+    command: ["python", "server/buyer/buyer_rest.py"]
+    ports:
+      - "${BUYER_REST_HOST_PORT_1:-9121}:9001"
+    restart: unless-stopped
+
+  buyer-rest-2:
+    build:
+      context: ../..
+      dockerfile: docker/Dockerfile
+    environment:
+      BUYER_SERVER_HOST: 0.0.0.0
+      BUYER_SERVER_PORT: 9001
+      SESSION_TIMEOUT_SECS: ${SESSION_TIMEOUT_SECS:-300}
+      <<: [*buyer-grpc-targets, *financial-env]
+    command: ["python", "server/buyer/buyer_rest.py"]
+    ports:
+      - "${BUYER_REST_HOST_PORT_2:-9122}:9001"
+    restart: unless-stopped
+
+  buyer-rest-3:
+    build:
+      context: ../..
+      dockerfile: docker/Dockerfile
+    environment:
+      BUYER_SERVER_HOST: 0.0.0.0
+      BUYER_SERVER_PORT: 9001
+      SESSION_TIMEOUT_SECS: ${SESSION_TIMEOUT_SECS:-300}
+      <<: [*buyer-grpc-targets, *financial-env]
+    command: ["python", "server/buyer/buyer_rest.py"]
+    ports:
+      - "${BUYER_REST_HOST_PORT_3:-9123}:9001"
+    restart: unless-stopped
+
+  buyer-rest-4:
+    build:
+      context: ../..
+      dockerfile: docker/Dockerfile
+    environment:
+      BUYER_SERVER_HOST: 0.0.0.0
+      BUYER_SERVER_PORT: 9001
+      SESSION_TIMEOUT_SECS: ${SESSION_TIMEOUT_SECS:-300}
+      <<: [*buyer-grpc-targets, *financial-env]
+    command: ["python", "server/buyer/buyer_rest.py"]
+    ports:
+      - "${BUYER_REST_HOST_PORT_4:-9124}:9001"
+    restart: unless-stopped

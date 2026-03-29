@@ -1,0 +1,21 @@
+# MariaDB + Python in one image. Starts DB then runs CMD (e.g. a gRPC replica).
+# Full PA3 mesh: prefer docker-compose.yml with dedicated MySQL + one container per replica.
+FROM python:3.11-bookworm
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    mariadb-server \
+    mariadb-client \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+COPY . .
+
+COPY docker/data-layer-entrypoint.sh /usr/local/bin/data-layer-entrypoint.sh
+RUN chmod +x /usr/local/bin/data-layer-entrypoint.sh
+
+ENV DATA_LAYER_DB_PASSWORD=dockerdb
+
+ENTRYPOINT ["/usr/local/bin/data-layer-entrypoint.sh"]
+CMD ["python", "-c", "import time; print('MariaDB ready; override CMD to run db_layer workers.'); time.sleep(999999)"]
