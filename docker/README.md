@@ -1,6 +1,6 @@
 # Docker (PA3 stack)
 
-**Command cheat sheet:** [docker/COMMANDS.md](COMMANDS.md) (copy-paste `docker compose` and script invocations). **GCP 3-VM example:** same file plus [docker/env.gcp.example](env.gcp.example).
+**Command cheat sheet:** [docker/COMMANDS.md](COMMANDS.md) (copy-paste `docker compose` and script invocations). **GCP 3-VM:** [docker/gcp-vars.template](gcp-vars.template) (copy the block for each VM into `docker/.env`; details in [COMMANDS.md](COMMANDS.md)).
 
 The stack is split into **Compose fragments** under `docker/compose/` so you can run layers on different hosts. The root `docker-compose.yml` **includes** all fragments (Compose v2.20+) for a single-command local bring-up.
 
@@ -13,7 +13,7 @@ The stack is split into **Compose fragments** under `docker/compose/` so you can
 | **Financial** | `docker/compose/financial.yml` | SOAP card service. |
 | **REST** | `docker/compose/rest.yml` | **5× seller-rest** and **5× buyer-rest** HTTP frontends. |
 
-Other files: `docker/Dockerfile` (Python app image), `docker/Dockerfile.data-layer` (optional DB+app combo), `docker/mysql/init/` (creates `umar` on first MySQL start).
+Other files: `docker/Dockerfile` (Python app image), `docker/Dockerfile.data-layer` (optional DB+app combo), `docker/mysql/init/` (ensures `root`@`%` matches `MYSQL_ROOT_PASSWORD` / `DB_PASSWORD`).
 
 ## One machine (full stack)
 

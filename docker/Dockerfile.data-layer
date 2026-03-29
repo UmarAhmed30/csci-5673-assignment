@@ -15,7 +15,7 @@ COPY . .
 COPY docker/data-layer-entrypoint.sh /usr/local/bin/data-layer-entrypoint.sh
 RUN chmod +x /usr/local/bin/data-layer-entrypoint.sh
 
-ENV DATA_LAYER_DB_PASSWORD=dockerdb
+ENV DATA_LAYER_DB_PASSWORD=Test@123
 
 ENTRYPOINT ["/usr/local/bin/data-layer-entrypoint.sh"]
 CMD ["python", "-c", "import time; print('MariaDB ready; override CMD to run db_layer workers.'); time.sleep(999999)"]

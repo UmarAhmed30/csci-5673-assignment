@@ -8,12 +8,12 @@
 x-db-env: &db-env
   CUSTOMER_DB_HOST: ${DB_HOST:-mysql}
   CUSTOMER_DB_PORT: ${DB_PORT:-3306}
-  CUSTOMER_DB_USER: umar
-  CUSTOMER_DB_PASSWORD: ${DB_PASSWORD:-dockerdb}
+  CUSTOMER_DB_USER: ${DB_USER:-root}
+  CUSTOMER_DB_PASSWORD: ${DB_PASSWORD:-Test@123}
   PRODUCT_DB_HOST: ${DB_HOST:-mysql}
   PRODUCT_DB_PORT: ${DB_PORT:-3306}
-  PRODUCT_DB_USER: umar
-  PRODUCT_DB_PASSWORD: ${DB_PASSWORD:-dockerdb}
+  PRODUCT_DB_USER: ${DB_USER:-root}
+  PRODUCT_DB_PASSWORD: ${DB_PASSWORD:-Test@123}
 
 services:
   product-grpc-0: &product-grpc

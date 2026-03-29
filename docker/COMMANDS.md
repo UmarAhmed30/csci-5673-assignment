@@ -27,12 +27,31 @@ Use **internal IPs** on the same VPC for VM→VM traffic (lower latency, no extr
 
 **Order:** (1) **db-instance** → wait for `db-init` OK → (2) **grpc-layer** with `DB_HOST=10.128.0.8` → (3) **rest-server** with gRPC/financial pointing at `10.128.0.7`.
 
+### Base `docker/.env` on GCP
+
+Repo file **`docker/gcp-vars.template`** is tracked in git (unlike `docker/.env.example`, which may be ignored). On each VM, create **`docker/.env`** with only the block for that role:
+
+```bash
+cd ~/csci-5673-assignment   # after clone
+nano docker/.env
+# Paste the db-instance OR grpc-layer OR rest-server section from docker/gcp-vars.template,
+# set REPLACE_WITH_* IPs and strong passwords, save.
+```
+
+Or copy and trim:
+
+```bash
+cp docker/gcp-vars.template docker/.env
+nano docker/.env   # delete the sections you do not need on this VM
+```
+
 ### 1) db-instance — database only
 
 SSH to **db-instance**, clone repo, then:
 
 ```bash
-cp docker/.env.example docker/.env
+cp docker/gcp-vars.template docker/.env
+# Edit: only the db-instance block; set MYSQL_ROOT_PASSWORD, DB_PASSWORD, MYSQL_PORT=3306
 # Set MYSQL_ROOT_PASSWORD, DB_PASSWORD; set MYSQL_PORT=3306 if exposing MySQL to other VMs
 docker compose -f docker/compose/db.yml --env-file docker/.env up -d
 docker compose -f docker/compose/db.yml --env-file docker/.env logs -f db-init
@@ -45,11 +64,8 @@ Wait until `db-init` exits **0**.
 SSH to **grpc-layer**:
 
 ```bash
-cp docker/.env.example docker/.env
-# In docker/.env set:
-#   DB_PASSWORD=<same as db-instance>
-#   DB_HOST=10.128.0.8
-#   DB_PORT=3306
+cp docker/gcp-vars.template docker/.env
+# Edit: only the grpc-layer block; DB_PASSWORD=<same as db-instance>, DB_HOST=<db internal IP>
 
 export DB_HOST=10.128.0.8
 export DB_PORT=3306
@@ -70,10 +86,11 @@ export DB_HOST=10.128.0.8 DB_PORT=3306
 SSH to **rest-server**. Point all replica hosts at **grpc-layer** internal IP `10.128.0.7` (same IP, different ports on that host). Point financial at the same VM if SOAP runs there:
 
 ```bash
-cp docker/.env.example docker/.env
+cp docker/gcp-vars.template docker/.env
+# Edit: only the rest-server block; set REPLACE_WITH_GRPC_INTERNAL_IP to 10.128.0.7 (or your grpc IP)
 ```
 
-Append or merge from `docker/env.gcp.example`, then:
+Then export (or rely on values already in `docker/.env`):
 
 ```bash
 export DOCKER_SELLER_GRPC_REPLICA_0_HOST=10.128.0.7
@@ -237,3 +254,31 @@ docker compose -f docker/compose/db.yml -f docker/compose/grpc.yml --env-file do
 ## Clients on the host
 
 Point root `.env` at published REST ports (e.g. seller `9020`, buyer `9120`) and optional five replica entries — see `docker/README.md`.
+
+### Testing against GCP `rest-server` (from your laptop)
+
+Use the **external** IP of the VM that runs the REST stack (see table above: e.g. **34.9.1.238** or **34.63.168.86**). Open firewall rules so your client can reach **TCP 9020–9024** (seller) and **9120–9124** (buyer) on that host.
+
+From the repo root, with dependencies installed (`pip install -r requirements.txt`):
+
+```bash
+# Default REST_HOST=34.9.1.238; override for the other NIC or a different IP:
+export REST_HOST=34.9.1.238
+./scripts/run-remote-seller-client.sh
+./scripts/run-remote-buyer-client.sh
+```
+
+Alternatively, edit **`client/gcp-test.vars`** (set `REST_SERVER_EXTERNAL_HOST`) and run:
+
+```bash
+set -a && source client/gcp-test.vars && set +a
+python3 client/seller/seller.py
+python3 client/buyer/buyer.py
+```
+
+Quick reachability check:
+
+```bash
+curl -sS -o /dev/null -w "%{http_code}\n" --connect-timeout 3 "http://${REST_HOST:-34.9.1.238}:9020/docs" || true
+```
+(Expect `200` if FastAPI exposes `/docs` on the seller REST app; otherwise adjust the path to a known route.)
