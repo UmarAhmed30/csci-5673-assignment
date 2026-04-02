@@ -19,13 +19,13 @@ Use **internal IPs** on the same VPC for VM→VM traffic (lower latency, no extr
 
 | VM | Role | Internal (nic0 / nic1) | External (nic0 / nic1) |
 |----|------|-------------------------|-------------------------|
-| **db-instance** | MySQL + `db-init` | 10.128.0.8 / 10.0.0.6 | 136.112.129.107 / 34.44.143.105 |
-| **grpc-layer** | product / seller / buyer gRPC + **financial** (recommended) | 10.128.0.7 / 10.0.0.5 | 34.45.175.52 / 34.136.42.189 |
+| **db-instance** | MySQL + `db-init` | 10.128.0.8 / 10.0.0.6 | 35.223.72.1 / 34.44.143.105 |
+| **grpc-layer** | product / seller / buyer gRPC + **financial** (recommended) | 10.128.0.10 / 10.0.0.5 | 34.45.175.52 / 34.136.42.189 |
 | **rest-server** | 5× seller REST + 5× buyer REST | 10.128.0.6 / 10.0.0.4 | 34.9.1.238 / 34.63.168.86 |
 
 **Firewall / VPC:** allow **TCP 3306** from `grpc-layer` → `db-instance`. Allow **TCP** (gRPC + Raft + SOAP ports) and **UDP** (broadcast) from `rest-server` → `grpc-layer` as needed. See `## Default host ports` below.
 
-**Order:** (1) **db-instance** → wait for `db-init` OK → (2) **grpc-layer** with `DB_HOST=10.128.0.8` → (3) **rest-server** with gRPC/financial pointing at `10.128.0.7`.
+**Order:** (1) **db-instance** → wait for `db-init` OK → (2) **grpc-layer** with `DB_HOST=35.223.72.1` → (3) **rest-server** with gRPC/financial pointing at `10.128.0.10`.
 
 ### Base `docker/.env` on GCP
 
@@ -67,7 +67,7 @@ SSH to **grpc-layer**:
 cp docker/gcp-vars.template docker/.env
 # Edit: only the grpc-layer block; DB_PASSWORD=<same as db-instance>, DB_HOST=<db internal IP>
 
-export DB_HOST=10.128.0.8
+export DB_HOST=35.223.72.1
 export DB_PORT=3306
 docker compose -f docker/compose/grpc.yml --env-file docker/.env up -d
 docker compose -f docker/compose/financial.yml --env-file docker/.env up -d
@@ -76,34 +76,34 @@ docker compose -f docker/compose/financial.yml --env-file docker/.env up -d
 Or use scripts (after exporting `DB_HOST` / `DB_PORT`):
 
 ```bash
-export DB_HOST=10.128.0.8 DB_PORT=3306
+export DB_HOST=35.223.72.1 DB_PORT=3306
 ./scripts/run-grpc.sh up -d
 ./scripts/run-financial.sh up -d
 ```
 
 ### 3) rest-server — HTTP REST only
 
-SSH to **rest-server**. Point all replica hosts at **grpc-layer** internal IP `10.128.0.7` (same IP, different ports on that host). Point financial at the same VM if SOAP runs there:
+SSH to **rest-server**. Point all replica hosts at **grpc-layer** internal IP `10.128.0.10` (same IP, different ports on that host). Point financial at the same VM if SOAP runs there:
 
 ```bash
 cp docker/gcp-vars.template docker/.env
-# Edit: only the rest-server block; set REPLACE_WITH_GRPC_INTERNAL_IP to 10.128.0.7 (or your grpc IP)
+# Edit: only the rest-server block; set REPLACE_WITH_GRPC_INTERNAL_IP to 10.128.0.10 (or your grpc IP)
 ```
 
 Then export (or rely on values already in `docker/.env`):
 
 ```bash
-export DOCKER_SELLER_GRPC_REPLICA_0_HOST=10.128.0.7
-export DOCKER_SELLER_GRPC_REPLICA_1_HOST=10.128.0.7
-export DOCKER_SELLER_GRPC_REPLICA_2_HOST=10.128.0.7
-export DOCKER_SELLER_GRPC_REPLICA_3_HOST=10.128.0.7
-export DOCKER_SELLER_GRPC_REPLICA_4_HOST=10.128.0.7
-export DOCKER_BUYER_GRPC_REPLICA_0_HOST=10.128.0.7
-export DOCKER_BUYER_GRPC_REPLICA_1_HOST=10.128.0.7
-export DOCKER_BUYER_GRPC_REPLICA_2_HOST=10.128.0.7
-export DOCKER_BUYER_GRPC_REPLICA_3_HOST=10.128.0.7
-export DOCKER_BUYER_GRPC_REPLICA_4_HOST=10.128.0.7
-export DOCKER_FINANCIAL_SERVICE_HOST=10.128.0.7
+export DOCKER_SELLER_GRPC_REPLICA_0_HOST=10.128.0.10
+export DOCKER_SELLER_GRPC_REPLICA_1_HOST=10.128.0.10
+export DOCKER_SELLER_GRPC_REPLICA_2_HOST=10.128.0.10
+export DOCKER_SELLER_GRPC_REPLICA_3_HOST=10.128.0.10
+export DOCKER_SELLER_GRPC_REPLICA_4_HOST=10.128.0.10
+export DOCKER_BUYER_GRPC_REPLICA_0_HOST=10.128.0.10
+export DOCKER_BUYER_GRPC_REPLICA_1_HOST=10.128.0.10
+export DOCKER_BUYER_GRPC_REPLICA_2_HOST=10.128.0.10
+export DOCKER_BUYER_GRPC_REPLICA_3_HOST=10.128.0.10
+export DOCKER_BUYER_GRPC_REPLICA_4_HOST=10.128.0.10
+export DOCKER_FINANCIAL_SERVICE_HOST=10.128.0.10
 export DOCKER_FINANCIAL_SERVICE_PORT=8002
 
 ./scripts/run-rest.sh up -d

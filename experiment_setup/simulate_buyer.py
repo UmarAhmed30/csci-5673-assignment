@@ -116,5 +116,5 @@ def run_evaluation(num_users, op):
 
 
 if __name__ == "__main__":
-    run_evaluation(10, "get_seller_rating")
-    run_evaluation(10, "search_items")
+    # run_evaluation(100, "get_seller_rating")
+    run_evaluation(1, "search_items")

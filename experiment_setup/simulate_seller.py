@@ -6,7 +6,7 @@ import uuid
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from client.seller.seller import SellerClient  
 
-num_api_calls = 1000
+num_api_calls = 100
 
 avg_latencies_per_client = []
 throughputs_per_client = []
@@ -115,5 +115,5 @@ def run_evaluation(num_users, op):
         print("Evaluation Failed")
 
 if __name__ == "__main__":
-    run_evaluation(10, "display_items_for_sale")
-    run_evaluation(10, "register_item_for_sale")
+    run_evaluation(100, "display_items_for_sale")
+    # run_evaluation(100, "register_item_for_sale")
