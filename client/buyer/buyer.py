@@ -1,3 +1,4 @@
+import random
 import sys
 from pathlib import Path
 import requests
@@ -52,7 +53,9 @@ class BuyerClient:
             self.session = None
 
     def send(self, method, endpoint, json_data=None):
-        # Try each replica at most once per call before giving up.
+        # Pick a random starting replica for each call, then fail over sequentially.
+        self._replica_idx = random.randrange(len(self._replicas))
+        self._update_base_url()
         for attempt in range(len(self._replicas)):
             url = f"{self.base_url}{endpoint}"
             headers = {}
